@@ -5,15 +5,23 @@ import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
 import "vetx-token/contracts/VetXToken.sol";
 import "./DLLBytes32.sol";
 
-contract Registry is Ownable {
-    event Vote(address voter, bytes32 hash, bool voteFor, uint value);
 
+contract Registry is Ownable {
     using SafeMath for uint;
     using DLLBytes32 for DLLBytes32.Data;
 
+    event Vote(address voter, bytes32 hash, bool voteFor, uint value);
+    event Whitelist(address sender, bytes32 hash, bool success);
+
+    enum State {
+        INIT_STATE,
+        PENDING,
+        WHITE_LISTED
+    }
 
     struct Project {
         bytes32 hash;           // IPFS data hash
+        State state;
     }
 
     struct Poll {
@@ -31,7 +39,8 @@ contract Registry is Ownable {
 
     VetXToken public token;
 
-    uint public constant voteDuration = 10 minutes;
+    uint public constant VOTE_DURATION = 10 minutes;
+    uint public constant MIN_VOTE_THRESHOLD = 1000;
 
     uint public voteStartTime = 0;
 
@@ -41,15 +50,34 @@ contract Registry is Ownable {
 
     modifier voteInProgress() {
         // solium-disable-next-line security/no-block-members
-        require(voteStartTime <= block.timestamp && block.timestamp < voteStartTime.add(voteDuration));
+        require(voteStartTime <= block.timestamp && block.timestamp < voteStartTime.add(VOTE_DURATION));
         _;
     }
 
     modifier voteNotInProgress(bytes32 hash) {
         require(polls[hash].startTime == voteStartTime);
         // solium-disable-next-line security/no-block-members
-        require(polls[hash].startTime.add(voteDuration) <= block.timestamp);
+        require(polls[hash].startTime.add(VOTE_DURATION) <= block.timestamp);
         _;
+    }
+
+    modifier voteAble(bytes32 hash) {
+        require(projects[hash].state != State.WHITE_LISTED);
+        _;
+    }
+
+    function whitelist(bytes32 hash) external {
+        require(projects[hash].hash == hash && projects[hash].state == State.PENDING);
+
+        uint support;
+        uint against;
+        (support, against) = getPollVotes(hash);
+        if (support > against && support.add(against) >= MIN_VOTE_THRESHOLD) {
+            projects[hash].state = State.WHITE_LISTED;
+            emit Whitelist(msg.sender, hash, true);
+        } else {
+            emit Whitelist(msg.sender, hash, false);
+        }
     }
 
     function addProject(bytes32 hash) external onlyOwner {
@@ -57,12 +85,13 @@ contract Registry is Ownable {
         // insert to front
         projectList.insert(projectList.getPrev(bytes32(0x0)), hash, bytes32(0x0));
         projects[hash].hash = hash;
+        projects[hash].state = State.PENDING;
     }
 
     function setVoteStartTime(uint startTime) external onlyOwner {
         // last vote has finished
         // solium-disable-next-line security/no-block-members
-        require(voteStartTime == 0 || voteStartTime.add(voteDuration) <= block.timestamp);
+        require(voteStartTime == 0 || voteStartTime.add(VOTE_DURATION) <= block.timestamp);
         voteStartTime = startTime;
     }
 
@@ -70,8 +99,11 @@ contract Registry is Ownable {
         return projectList.getNext(curr);
     }
 
-    function vote(address voter, bytes32 hash, bool voteFor, uint value) external voteInProgress {
-
+    function vote(address voter, bytes32 hash, bool voteFor, uint value) 
+        external 
+        voteInProgress 
+        voteAble(hash)
+    {
         // project exists
         require(projects[hash].hash != bytes32(0x0));
 
