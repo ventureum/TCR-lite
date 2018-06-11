@@ -18,13 +18,6 @@ module.exports = {
   // for more about customizing your Truffle configuration!
   networks: {
     development: {
-      provider: new HDWalletProvider(mnemonic, 'http://localhost:8545', 0, 10),
-      host: '127.0.0.1',
-      port: 8545,
-      network_id: '*', // Match any network id
-      gas: 5000000
-    },
-    testing: {
       host: '127.0.0.1',
       port: 8545,
       network_id: '*', // Match any network id
@@ -48,12 +41,6 @@ module.exports = {
       port: 8555,         // <-- If you change this, also set the port option in .solcover.js.
       gas: 0xfffffffffff, // <-- Use this high gas value
       gasPrice: 0x01      // <-- Use this low gas price
-    }
-  },
-  mocha: {
-    reporter: 'eth-gas-reporter',
-    reporterOptions: {
-      currency: 'USD'
     }
   }
 };

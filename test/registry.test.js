@@ -7,9 +7,9 @@ const BigNumber = web3.BigNumber
 
 // eslint-disable-next-line
 const should = require('chai')
-  .use(require('chai-as-promised'))
-  .use(require('chai-bignumber')(BigNumber))
-  .should()
+      .use(require('chai-as-promised'))
+      .use(require('chai-bignumber')(BigNumber))
+      .should()
 
 const Registry = artifacts.require('Registry')
 const Token = artifacts.require('VetXToken')
@@ -29,6 +29,10 @@ contract('Basic Tests: ', function ([root, voter1, voter2, voter3, _]) {
     this.token = await Token.new('10000', 'VetX', 18, 'VTX')
     this.registry = await Registry.new(this.token.address)
 
+    this.PENDING_LIST = await this.registry.PENDING_LIST.call()
+    this.VOTING_LIST = await this.registry.VOTING_LIST.call()
+    this.WHITELIST_LIST = await this.registry.WHITELIST_LIST.call()
+
     await this.token.transfer(voter1, 100, {from: root})
     await this.token.transfer(voter2, 50, {from: root})
     await this.token.transfer(voter3, 500, {from: root})
@@ -43,25 +47,17 @@ contract('Basic Tests: ', function ([root, voter1, voter2, voter3, _]) {
 
     it('Add One Project', async function () {
       await this.registry.addProject(projects[0]).should.be.fulfilled
-      let next = await this.registry.getNextProjectHash.call(0)
+      let next = await this.registry.getNextProjectHash.call(this.PENDING_LIST, 0)
       next.should.equal(projects[0])
     })
 
     it('Add Two Projects', async function () {
       await this.registry.addProject(projects[0]).should.be.fulfilled
       await this.registry.addProject(projects[1]).should.be.fulfilled
-      let first = await this.registry.getNextProjectHash.call(0)
-      let second = await this.registry.getNextProjectHash.call(first)
+      let first = await this.registry.getNextProjectHash.call(this.PENDING_LIST, 0)
+      let second = await this.registry.getNextProjectHash.call(this.PENDING_LIST, first)
       first.should.equal(projects[0])
       second.should.equal(projects[1])
-    })
-  })
-
-  describe('Owner Functions: ', function () {
-    it('setVoteStartTime', async function () {
-      await this.registry.setVoteStartTime('123456').should.be.fulfilled
-      let startTime = await this.registry.voteStartTime.call()
-      startTime.should.be.bignumber.equal(new BigNumber(123456))
     })
   })
 
@@ -83,9 +79,7 @@ contract('Basic Tests: ', function ([root, voter1, voter2, voter3, _]) {
     })
 
     it('Should be able to vote (for) when vote has started', async function () {
-      let openingTime = latestTime() + duration.days(1)
-      await this.registry.setVoteStartTime(openingTime).should.be.fulfilled
-      await increaseTimeTo(openingTime)
+      await this.registry.startPoll(projects[0]).should.be.fulfilled
 
       await this.token.approveAndCall(this.registry.address, 100, this.voteForCalldata100, {from: voter1}).should.be.fulfilled
 
@@ -100,9 +94,7 @@ contract('Basic Tests: ', function ([root, voter1, voter2, voter3, _]) {
     })
 
     it('Should be able to vote (against) when vote has started', async function () {
-      let openingTime = latestTime() + duration.days(1)
-      await this.registry.setVoteStartTime(openingTime).should.be.fulfilled
-      await increaseTimeTo(openingTime)
+      await this.registry.startPoll(projects[0]).should.be.fulfilled
 
       await this.token.approveAndCall(this.registry.address, 100, this.voteAgainstCalldata100, {from: voter1}).should.be.fulfilled
 
@@ -118,71 +110,84 @@ contract('Basic Tests: ', function ([root, voter1, voter2, voter3, _]) {
     })
 
     it('Should not be able to vote when whitelisted', async function () {
-        let openingTime = latestTime() + duration.days(1)
-        await this.registry.setVoteStartTime(openingTime).should.be.fulfilled
-        await increaseTimeTo(openingTime)
+      await this.registry.startPoll(projects[0]).should.be.fulfilled
 
-        //await this.token.transfer(voter2, , {from: root})
-        await this.token.approveAndCall(this.registry.address, 100, this.voteAgainstCalldata100, {from: voter1})
-            .should.be.fulfilled;
-        await this.token.approveAndCall(this.registry.address, 500, this.voteForCalldata500, {from: voter3})
-          .should.be.fulfilled;
-        let { logs } = await this.registry.whitelist(projects[0]).should.be.fulfilled;
-        let event = logs.find(e => e.event === "Whitelist");
-        should.exist(event);
-        event.args.hash.should.be.equal(projects[0]);
-        event.args.success.should.be.equal(false);
+      await this.token.approveAndCall(this.registry.address, 100, this.voteAgainstCalldata100, {from: voter1})
+        .should.be.fulfilled;
+      await this.token.approveAndCall(this.registry.address, 500, this.voteForCalldata500, {from: voter3})
+        .should.be.fulfilled;
 
-        await this.token.transfer(voter1, 100, {from: root})
-        await this.token.approveAndCall(this.registry.address, 100, this.voteAgainstCalldata100, {from: voter1})
-            .should.be.fulfilled;
-        await this.token.transfer(voter3, 500, {from: root});
-        await this.token.approveAndCall(this.registry.address, 500, this.voteForCalldata500, {from: voter3})
-          .should.be.fulfilled;
+      let [, closingTime] = await this.registry.getVoteStartingTimeAndEndingTime.call(projects[0])
+      await increaseTimeTo(closingTime)
 
-        await this.registry.whitelist(projects[0]).should.be.fulfilled;
-        await this.token.approveAndCall(this.registry.address, 50, this.voteForCalldata50, {from: voter2})
-          .should.be.rejectedWith(EVMRevert);
-        await this.token.approveAndCall(this.registry.address, 50, this.voteAgainstCalldata50, {from: voter2})
-          .should.be.rejectedWith(EVMRevert);
+      let { logs } = await this.registry.whitelist(projects[0]).should.be.fulfilled;
+      let event = logs.find(e => e.event === "Whitelist");
+      should.exist(event);
+      event.args.hash.should.be.equal(projects[0]);
+      event.args.success.should.be.equal(true);
+
+      await this.token.approveAndCall(this.registry.address, 50, this.voteForCalldata50, {from: voter2})
+        .should.be.rejectedWith(EVMRevert);
+      await this.token.approveAndCall(this.registry.address, 50, this.voteAgainstCalldata50, {from: voter2})
+        .should.be.rejectedWith(EVMRevert);
     });
 
-    it('Should not be whitelisted', async function () {
-        let openingTime = latestTime() + duration.days(1)
-        await this.registry.setVoteStartTime(openingTime).should.be.fulfilled
-        await increaseTimeTo(openingTime)
+    it('Should be whitelisted when voteAgainst < voteFor after poll finished', async function () {
+      await this.registry.startPoll(projects[0]).should.be.fulfilled
 
-        await this.token.approveAndCall(this.registry.address, 500, this.voteAgainstCalldata500, {from: voter3})
-            .should.be.fulfilled;
-        await this.token.transfer(voter3, 500, {from: root})
-        await this.token.approveAndCall(this.registry.address, 500, this.voteForCalldata500, {from: voter3})
-          .should.be.fulfilled;
-        let { logs } = await this.registry.whitelist(projects[0]).should.be.fulfilled;
-        let event = logs.find(e => e.event === "Whitelist");
-        should.exist(event);
-        event.args.hash.should.be.equal(projects[0]);
-        event.args.success.should.be.equal(false);
+      await this.token.approveAndCall(this.registry.address, 500, this.voteForCalldata500, {from: voter3})
+        .should.be.fulfilled;
 
-        await this.token.transfer(voter1, 100, {from: root})
-        await this.token.approveAndCall(this.registry.address, 100, this.voteAgainstCalldata100, {from: voter1})
-            .should.be.fulfilled;
+      let [, closingTime] = await this.registry.getVoteStartingTimeAndEndingTime.call(projects[0])
+      await increaseTimeTo(closingTime)
+
+      let { logs } = await this.registry.whitelist(projects[0]).should.be.fulfilled;
+      let event = logs.find(e => e.event === "Whitelist");
+      should.exist(event);
+      event.args.hash.should.be.equal(projects[0]);
+      event.args.success.should.be.equal(true);
+    });
+
+    it('Should not be whitelisted when voteAgainst >= voteFor after poll finished', async function () {
+      await this.registry.startPoll(projects[0]).should.be.fulfilled
+
+      await this.token.approveAndCall(this.registry.address, 500, this.voteAgainstCalldata500, {from: voter3})
+        .should.be.fulfilled;
+
+      let [, closingTime] = await this.registry.getVoteStartingTimeAndEndingTime.call(projects[0])
+      await increaseTimeTo(closingTime)
+
+      let { logs } = await this.registry.whitelist(projects[0]).should.be.fulfilled;
+      let event = logs.find(e => e.event === "Whitelist");
+      should.exist(event);
+      event.args.hash.should.be.equal(projects[0]);
+      event.args.success.should.be.equal(false);
+    });
+
+    it('Should not be whitelisted when total votes < threshold', async function () {
+      await this.registry.startPoll(projects[0]).should.be.fulfilled
+
+      let [, closingTime] = await this.registry.getVoteStartingTimeAndEndingTime.call(projects[0])
+      await increaseTimeTo(closingTime)
+
+      let { logs } = await this.registry.whitelist(projects[0]).should.be.fulfilled;
+      let event = logs.find(e => e.event === "Whitelist");
+      should.exist(event);
+      event.args.hash.should.be.equal(projects[0]);
+      event.args.success.should.be.equal(false);
     });
 
     it('Should delist of voteAgainst > voteFor after poll finished', async function () {
-      let openingTime = latestTime() + duration.days(1)
-
-      let endingTime = openingTime + this.voteDuration
-
-      await this.registry.setVoteStartTime(openingTime).should.be.fulfilled
-      await increaseTimeTo(openingTime)
+      await this.registry.startPoll(projects[0]).should.be.fulfilled
 
       await this.token.approveAndCall(this.registry.address, 100, this.voteAgainstCalldata100, {from: voter1}).should.be.fulfilled
 
-      await increaseTimeTo(endingTime)
+      let [, closingTime] = await this.registry.getVoteStartingTimeAndEndingTime.call(projects[0])
+      await increaseTimeTo(closingTime)
 
       await this.registry.delist(projects[0]).should.be.fulfilled
 
-      let first = await this.registry.getNextProjectHash.call(0)
+      let first = await this.registry.getNextProjectHash.call(this.VOTING_LIST,0)
 
       first = web3.toDecimal(first)
 
@@ -191,45 +196,19 @@ contract('Basic Tests: ', function ([root, voter1, voter2, voter3, _]) {
     })
 
     it('Should revert if delist when voteAgainst > voteFor before poll finishes', async function () {
-      let openingTime = latestTime() + duration.days(1)
-
-      await this.registry.setVoteStartTime(openingTime).should.be.fulfilled
-      await increaseTimeTo(openingTime)
-
+      await this.registry.startPoll(projects[0]).should.be.fulfilled
       await this.token.approveAndCall(this.registry.address, 100, this.voteAgainstCalldata100, {from: voter1}).should.be.fulfilled
-
-      await this.registry.delist(projects[0]).should.be.rejectedWith(EVMRevert)
-    })
-
-    it('Should revert if delist when voteAgainst > voteFor, if the next poll has started', async function () {
-      let openingTime = latestTime() + duration.days(1)
-
-      let endingTime = openingTime + this.voteDuration
-
-      await this.registry.setVoteStartTime(openingTime).should.be.fulfilled
-      await increaseTimeTo(openingTime)
-
-      await this.token.approveAndCall(this.registry.address, 100, this.voteAgainstCalldata100, {from: voter1}).should.be.fulfilled
-
-      // Finish this poll
-      await increaseTimeTo(endingTime)
-
-      await this.registry.setVoteStartTime(endingTime + 1).should.be.fulfilled
 
       await this.registry.delist(projects[0]).should.be.rejectedWith(EVMRevert)
     })
 
     it('Withdraw rewards after poll, one voter', async function () {
-      let openingTime = latestTime() + duration.days(1)
-
-      let endingTime = openingTime + this.voteDuration
-
-      await this.registry.setVoteStartTime(openingTime).should.be.fulfilled
-      await increaseTimeTo(openingTime)
+      await this.registry.startPoll(projects[0]).should.be.fulfilled
 
       await this.token.approveAndCall(this.registry.address, 100, this.voteAgainstCalldata100, {from: voter1}).should.be.fulfilled
 
-      await increaseTimeTo(endingTime)
+      let [, closingTime] = await this.registry.getVoteStartingTimeAndEndingTime.call(projects[0])
+      await increaseTimeTo(closingTime)
 
       await this.registry.withdraw(projects[0], {from: voter1}).should.be.fulfilled
 
@@ -238,10 +217,7 @@ contract('Basic Tests: ', function ([root, voter1, voter2, voter3, _]) {
     })
 
     it('Revert if withdraw rewards before poll finishes, one voter', async function () {
-      let openingTime = latestTime() + duration.days(1)
-
-      await this.registry.setVoteStartTime(openingTime).should.be.fulfilled
-      await increaseTimeTo(openingTime)
+      await this.registry.startPoll(projects[0]).should.be.fulfilled
 
       await this.token.approveAndCall(this.registry.address, 100, this.voteAgainstCalldata100, {from: voter1}).should.be.fulfilled
 
@@ -249,17 +225,13 @@ contract('Basic Tests: ', function ([root, voter1, voter2, voter3, _]) {
     })
 
     it('Withdraw rewards after poll, two voters, votes differently', async function () {
-      let openingTime = latestTime() + duration.days(1)
-
-      let endingTime = openingTime + this.voteDuration
-
-      await this.registry.setVoteStartTime(openingTime).should.be.fulfilled
-      await increaseTimeTo(openingTime)
+      await this.registry.startPoll(projects[0]).should.be.fulfilled
 
       await this.token.approveAndCall(this.registry.address, 100, this.voteAgainstCalldata100, {from: voter1}).should.be.fulfilled
       await this.token.approveAndCall(this.registry.address, 50, this.voteForCalldata50, {from: voter2}).should.be.fulfilled
 
-      await increaseTimeTo(endingTime)
+      let [, closingTime] = await this.registry.getVoteStartingTimeAndEndingTime.call(projects[0])
+      await increaseTimeTo(closingTime)
 
       await this.registry.withdraw(projects[0], {from: voter1}).should.be.fulfilled
 
@@ -271,17 +243,13 @@ contract('Basic Tests: ', function ([root, voter1, voter2, voter3, _]) {
     })
 
     it('Withdraw rewards after poll, two voters, both votes against', async function () {
-      let openingTime = latestTime() + duration.days(1)
-
-      let endingTime = openingTime + this.voteDuration
-
-      await this.registry.setVoteStartTime(openingTime).should.be.fulfilled
-      await increaseTimeTo(openingTime)
+      await this.registry.startPoll(projects[0]).should.be.fulfilled
 
       await this.token.approveAndCall(this.registry.address, 100, this.voteAgainstCalldata100, {from: voter1}).should.be.fulfilled
       await this.token.approveAndCall(this.registry.address, 50, this.voteAgainstCalldata50, {from: voter2}).should.be.fulfilled
 
-      await increaseTimeTo(endingTime)
+      let [, closingTime] = await this.registry.getVoteStartingTimeAndEndingTime.call(projects[0])
+      await increaseTimeTo(closingTime)
 
       await this.registry.withdraw(projects[0], {from: voter1}).should.be.fulfilled
 
@@ -295,18 +263,13 @@ contract('Basic Tests: ', function ([root, voter1, voter2, voter3, _]) {
     })
 
     it('Withdraw rewards after poll, two voters, both votes for', async function () {
-      let openingTime = latestTime() + duration.days(1)
-
-
-      let endingTime = openingTime + this.voteDuration
-
-      await this.registry.setVoteStartTime(openingTime).should.be.fulfilled
-      await increaseTimeTo(openingTime)
+      await this.registry.startPoll(projects[0]).should.be.fulfilled
 
       await this.token.approveAndCall(this.registry.address, 100, this.voteForCalldata100, {from: voter1}).should.be.fulfilled
       await this.token.approveAndCall(this.registry.address, 50, this.voteForCalldata50, {from: voter2}).should.be.fulfilled
 
-      await increaseTimeTo(endingTime)
+      let [, closingTime] = await this.registry.getVoteStartingTimeAndEndingTime.call(projects[0])
+      await increaseTimeTo(closingTime)
 
       await this.registry.withdraw(projects[0], {from: voter1}).should.be.fulfilled
 
