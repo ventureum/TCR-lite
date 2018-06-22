@@ -13,7 +13,6 @@
   "license": "ISC",
   "dependencies": {
     "moment": "^2.22.1",
-    "openzeppelin-solidity": "1.9.0",
     "vetx-token": "^1.0.0"
   },
   "devDependencies": {
@@ -22,10 +21,12 @@
     "babel-preset-stage-2": "^6.24.1",
     "babel-preset-stage-3": "^6.24.1",
     "babel-register": "^6.26.0",
+    "bs58": "^4.0.1",
     "chai": "^4.1.2",
     "chai-as-promised": "^7.1.1",
     "chai-bignumber": "^2.0.2",
     "eth-gas-reporter": "^0.1.5",
+    "openzeppelin-solidity": "1.9.0",
     "solidity-coverage": "^0.5.1",
     "truffle-hdwallet-provider": "0.0.4"
   },
