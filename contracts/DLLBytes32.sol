@@ -8,6 +8,7 @@ library DLLBytes32 {
 
     struct Data {
         mapping(bytes32 => Node) dll;
+        uint length;
     }
 
     function getNext(Data storage self, bytes32 curr) public view returns (bytes32) {
@@ -24,6 +25,8 @@ library DLLBytes32 {
 
         self.dll[prev].next = curr;
         self.dll[next].prev = curr;
+
+        self.length = self.length + 1;
     }
 
     function remove(Data storage self, bytes32 curr) public {
@@ -35,5 +38,9 @@ library DLLBytes32 {
 
         self.dll[curr].next = curr;
         self.dll[curr].prev = curr;
+
+        if (self.length > 0) {
+            self.length = self.length - 1;
+        }
     }
 }
