@@ -11,15 +11,19 @@ contract Forum is Ownable {
 
     event AddBoard(bytes32 indexed boardId, address token);
     event SetBoardToken(bytes32 indexed boardId, address token);
-    event Post(
-               bytes32 indexed boardId,
-               bytes32 parentHash,
-               bytes32 postHash,
-               bytes32 ipfsPath);
+    event Post (
+        address indexed poster,
+        bytes32 indexed boardId,
+        bytes32 parentHash,
+        bytes32 postHash,
+        bytes32 ipfsPath
+    );
 
-    event UpdatePost(
-                     bytes32 postHash,
-                     bytes32 ipfsPath);
+    event UpdatePost (
+        address indexed poster,
+        bytes32 postHash,
+        bytes32 ipfsPath
+    );
 
     event Upvote(address upvoter, bytes32 indexed boardId, bytes32 postHash, uint value);
     event Withdraw(address poster, bytes32 postHash, uint rewards);
@@ -88,7 +92,7 @@ contract Forum is Ownable {
             posts.insert(posts.getPrev(bytes32(0x0)), postHash, bytes32(0x0));
         }
 
-        emit Post(boardId, parentHash, postHash, ipfsPath);
+        emit Post(msg.sender, boardId, parentHash, postHash, ipfsPath);
     }
 
     function updatePost(
@@ -99,7 +103,7 @@ contract Forum is Ownable {
         require(author[postHash] == msg.sender);
         contents[postHash] = ipfsPath;
 
-        emit UpdatePost(postHash, ipfsPath);
+        emit UpdatePost(msg.sender, postHash, ipfsPath);
     }
 
     function upvote(address upvoter, bytes32 postHash, uint value) external {
