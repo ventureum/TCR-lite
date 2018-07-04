@@ -44,6 +44,7 @@ contract Forum is Ownable {
     mapping(bytes32 => address) public author;
     mapping(bytes32 => uint) public rewards;
     mapping(bytes32 => bytes32) public fromBoard;
+    mapping(bytes32 => uint) public replyLen;
 
     function boardExist(bytes32 boardId) internal view returns (bool) {
         return boards[boardId].exist;
@@ -86,6 +87,9 @@ contract Forum is Ownable {
             // reply
             DLLBytes32.Data storage replies = boards[boardId].replies[parentHash];
             replies.insert(replies.getPrev(bytes32(0x0)), postHash, bytes32(0x0));
+
+            // update reply length
+            replyLen[parentHash] = replyLen[parentHash].add(1);
         } else {
             // post
             DLLBytes32.Data storage posts = boards[boardId].posts;
@@ -147,62 +151,30 @@ contract Forum is Ownable {
         return boards[boardId].replies[postId].getNext(curr);
     }
 
-    function getBatchPostsByHashes(
-        bytes32 boardId,
-        bytes32 curr
-        )
+    /*
+      Retrieve a batch of posts/replies by hashes
+
+      @param hashes hash array of posts/replies to be retrieved
+      @returns a flatten array of posts/replies
+     */
+    function getBatchPosts(bytes32[] hashes)
         external
         view
         returns (bytes32[]) {
 
-        bytes32 _curr = curr;
-        bytes32[] memory posts = new bytes32[](BATCH_SIZE * 5);
-        for(uint i = 0; i < BATCH_SIZE * 5; i += 5) {
-            _curr = getNextPostByHash(boardId, _curr);
-            if (_curr == bytes32(0x0)) {
-                break;
-            }
-            posts[i] = _curr;
-            posts[i+1] = contents[_curr];
-            posts[i+2] = bytes32(author[_curr]);
-            posts[i+3] = bytes32(rewards[_curr]);
-            posts[i+4] = bytes32(getRepliesLength(boardId, _curr));
+        bytes32 _curr;
+        bytes32[] memory posts = new bytes32[](BATCH_SIZE * 6);
+        for(uint i = 0; i < hashes.length; i ++) {
+            _curr = hashes[i];
+            uint j = i * 6;
+            posts[j] = _curr; // hash
+            posts[j+1] = bytes32(boards[fromBoard[_curr]].token); // associated token address
+            posts[j+2] = contents[_curr]; // IPFS hash
+            posts[j+3] = bytes32(author[_curr]);  // author
+            posts[j+4] = bytes32(rewards[_curr]);  // rewards
+            posts[j+5] = bytes32(replyLen[_curr]); // number of replies
         }
-
         return posts;
-    }
-
-    function getBatchRepliesByHashes(
-        bytes32 boardId,
-        bytes32 postId,
-        bytes32 curr
-        )
-        external
-        view
-        returns (bytes32[]) {
-
-        bytes32 _curr = curr;
-        bytes32[] memory replies = new bytes32[](BATCH_SIZE * 4);
-        for(uint i = 0; i < 10; i += 4) {
-            _curr = getNextReplyByHash(boardId, postId, _curr);
-            if (_curr == bytes32(0x0)) {
-                break;
-            }
-            replies[i] = _curr;
-            replies[i+1] = contents[_curr];
-            replies[i+2] = bytes32(author[_curr]);
-            replies[i+3] = bytes32(rewards[_curr]);
-        }
-
-        return replies;
-    }
-
-    function getPostsLength(bytes32 boardId) public view returns (uint) {
-        return boards[boardId].posts.length;
-    }
-
-    function getRepliesLength(bytes32 boardId, bytes32 postId) public view returns (uint) {
-        return boards[boardId].replies[postId].length;
     }
 
     function getBoardToken(bytes32 boardId) external view returns (address) {
