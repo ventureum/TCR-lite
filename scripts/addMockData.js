@@ -1,4 +1,8 @@
 var BigNumber = require('bignumber.js')
+var stream = require('getstream')
+
+// server side
+const clientServer = stream.connect('', '')
 
 const Forum = artifacts.require('Forum')
 const Token = artifacts.require('VetXToken')
@@ -17,9 +21,12 @@ web3.eth.getAccountsPromise = function () {
 
 const tokens = [
   'VTX',
-  'ABC',
-  'XYZ'
+  'ABC'
 ]
+
+var activities = {}
+
+var userServer = []
 
 const boards = []
 
@@ -57,8 +64,8 @@ for (let i = 0; i < ipfsPaths.length; i++) {
 }
 
 // Set number of posts and replies here
-const NUM_POST_HASH = 20
-const NUM_REPLY_HASH = 5
+const NUM_POST_HASH = 12
+const NUM_REPLY_HASH = 3
 
 // convert token symbols to hash
 for (let i = 0; i < tokens.length; i++) {
@@ -87,43 +94,105 @@ module.exports = async function (callback) {
   var accounts = await web3.eth.getAccountsPromise()
   var forum = await Forum.deployed()
 
+  // prepare getstream users
+  for (let userId = 0; userId < 10; userId++) {
+    let _user = clientServer.feed('user', accounts[userId])
+    userServer.push(_user)
+  }
+
   console.log('================= Deploy Tokens =================')
   for (let i = 0; i < tokens.length; i++) {
     let erc20 = await Token.new(new BigNumber(1e27).toString(), tokens[i] + ' Token', 18, tokens[i])
     await forum.addBoard(boards[i], erc20.address)
     console.log('Token ' + tokens[i] + ' @ ' + erc20.address + ' for board ' + boards[i])
-    await erc20.approve(forum.address, new BigNumber(1e27).toString(), {from: accounts[0]})
+    for (let userId = 0; userId < 10; userId++) {
+      await erc20.approve(forum.address, new BigNumber(1e27).toString(), {from: accounts[userId]})
+    }
   }
   console.log('=================================================')
 
   console.log('================= Add Posts =================')
   for (let j = 0; j < tokens.length; j++) {
     for (let i = 0; i < NUM_POST_HASH; i++) {
-      await forum.post(boards[j], web3.toHex(0), posts[tokens[j]][i], ipfsMultihash[0].digest)
+      let userId = (j * i) % 10
+      await forum.post(boards[j], web3.toHex(0), posts[tokens[j]][i], ipfsMultihash[0].digest, {from: accounts[userId]})
+
+      // Add activity
+      let activity = {
+        actor: accounts[userId],
+        verb: 'submit',
+        object: 'post:' + posts[tokens[j]][i],
+        foreign_id: 'post:' + posts[tokens[j]][i],
+        time: new Date(),
+        rewards: 0,
+        to: ['board:all', 'board:' + boards[j]]
+      }
+
+      // add activity to our mapping
+      activities['post:' + posts[tokens[j]][i]] = activity
+
+      // remove previously added activity
+      await userServer[userId].removeActivity({foreignId: activity.foreign_id})
+
+      // add a new activity
+      await userServer[userId].addActivity(activity)
+
       console.log('Add post ' + posts[tokens[j]][i] + ' to board ' + boards[j])
     }
   }
   console.log('=================================================')
 
+  /*
   console.log('================= Add Comments =================')
   for (let j = 0; j < tokens.length; j++) {
     for (let i = 0; i < NUM_POST_HASH; i++) {
       for (let k = 0; k < NUM_REPLY_HASH; k++) {
-        await forum.post(boards[j], posts[tokens[j]][i], replies[posts[tokens[j]][i]][k], ipfsMultihash[0].digest)
+        let userId = (i * j * k) % 10
+        await forum.post(boards[j], posts[tokens[j]][i], replies[posts[tokens[j]][i]][k], ipfsMultihash[0].digest, {from: accounts[userId]})
+
+        // Add activity
+        let activity = {
+          actor: accounts[userId],
+          verb: 'reply',
+          object: 'reply:' + replies[posts[tokens[j]][i]][k],
+          foreign_id: 'reply:' + replies[posts[tokens[j]][i]][k],
+          time: new Date(),
+          to: ['comment:' + posts[tokens[j]][i]]
+        }
+
+        // remove previously added activity
+        await userServer[userId].removeActivity({foreignId: activity.foreign_id})
+
+        // add a new activity
+        await userServer[userId].addActivity(activity)
+
         console.log('Add reply ' + replies[posts[tokens[j]][i]][k] + ' to post ' + posts[tokens[j]][i])
       }
     }
   }
   console.log('=================================================')
+  */
 
   console.log('================= Upvotes =================')
 
   for (let j = 0; j < tokens.length; j++) {
     for (let i = 0; i < NUM_POST_HASH; i++) {
+      let userId = (j * i) % 10
       let base = new BigNumber(1e18)
       let val = (i + 1) * (j + 1)
       let valBig = base.times(new BigNumber(val))
-      await forum.upvote(accounts[0], posts[tokens[j]][i], valBig.toString(), { from: accounts[0] })
+      await forum.upvote(accounts[0], posts[tokens[j]][i], valBig.toString(), { from: accounts[userId] })
+
+      // first retrieve the activity object
+      let activity = activities['post:' + posts[tokens[j]][i]]
+      activity.rewards += val
+
+      // update activity in our mapping
+      activities['post:' + posts[tokens[j]][i]] = activity
+
+      // update the activity to getstream
+      await clientServer.updateActivity(activity)
+
       console.log('Upvote ' + posts[tokens[j]][i] + ' with ' + val + ' ' + tokens[j])
     }
   }
