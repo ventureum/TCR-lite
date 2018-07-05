@@ -15,5 +15,7 @@ module.exports = function (deployer, network, accounts) {
     return deployer.link(DLLBytes32, [Registry, Forum])
   }).then(function () {
     return deployer.deploy(Registry, Token.address)
+  }).then(function () {
+    return deployer.deploy(Forum)
   })
 }

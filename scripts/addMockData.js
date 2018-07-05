@@ -13,6 +13,7 @@ web3.eth.getAccountsPromise = function () {
       if (e != null) {
         reject(e)
       } else {
+        console.log('accounts:', accounts)
         resolve(accounts)
       }
     })
@@ -28,6 +29,8 @@ var activities = {}
 
 var userServer = []
 
+let userTimelineFeeds = []
+
 const boards = []
 
 const bs58 = require('bs58')
@@ -37,9 +40,9 @@ const posts = {}
 const replies = {}
 
 const ipfsPaths = [
-  'QmfSYqbPt27MfWyzwJL3iBKzKvKfTLvn1W3xKR336edxiE',
-  'QmfSYqbPt27MfWyzwJL3iBKzKvKfTLvn1W3xKR336edxiE',
-  'QmfSYqbPt27MfWyzwJL3iBKzKvKfTLvn1W3xKR336edxiE']
+  'QmW1bPXjqDB6Pb5bv5mvS3oX2y5eePkAABvX9uNDm71PDu',
+  'QmW1bPXjqDB6Pb5bv5mvS3oX2y5eePkAABvX9uNDm71PDu',
+  'QmW1bPXjqDB6Pb5bv5mvS3oX2y5eePkAABvX9uNDm71PDu']
 
 const ipfsMultihash = []
 
@@ -97,8 +100,22 @@ module.exports = async function (callback) {
   // prepare getstream users
   for (let userId = 0; userId < 10; userId++) {
     let _user = clientServer.feed('user', accounts[userId])
+    console.log('user: ' + accounts[userId] + ' has token :' + _user.token)
     userServer.push(_user)
+    let _userTimelineFeed = clientServer.feed('timeline', accounts[userId])
+    console.log('userTimeline: ' + accounts[userId] + ' has token :' + _userTimelineFeed.token)
+    userTimelineFeeds.push(_userTimelineFeed)
+
+    let follows = [
+      {'source': `timeline:${accounts[userId]}`, 'target': `user:${accounts[userId]}`},
+      {'source': `timeline:${accounts[userId]}`, 'target': `board:all`}
+    ]
+
+    clientServer.followMany(follows)
   }
+
+  let _board = clientServer.feed('board', 'all')
+  console.log('board:all token is ' + _board.token)
 
   console.log('================= Deploy Tokens =================')
   for (let i = 0; i < tokens.length; i++) {
@@ -142,7 +159,6 @@ module.exports = async function (callback) {
   }
   console.log('=================================================')
 
-  /*
   console.log('================= Add Comments =================')
   for (let j = 0; j < tokens.length; j++) {
     for (let i = 0; i < NUM_POST_HASH; i++) {
@@ -171,7 +187,6 @@ module.exports = async function (callback) {
     }
   }
   console.log('=================================================')
-  */
 
   console.log('================= Upvotes =================')
 
