@@ -15,18 +15,24 @@ contract Forum is Ownable {
         address indexed poster,
         bytes32 indexed boardId,
         bytes32 parentHash,
-        bytes32 postHash,
+        bytes32 indexed postHash,
         bytes32 ipfsPath
     );
 
     event UpdatePost (
         address indexed poster,
-        bytes32 postHash,
+        bytes32 indexed postHash,
         bytes32 ipfsPath
     );
 
-    event Upvote(address upvoter, bytes32 indexed boardId, bytes32 postHash, uint value);
-    event Withdraw(address poster, bytes32 postHash, uint rewards);
+    event Upvote(
+        address indexed upvoter,
+        bytes32 indexed boardId,
+        bytes32 indexed postHash,
+        uint value
+    );
+
+    event Withdraw(address indexed poster, bytes32 indexed postHash, uint rewards);
 
     struct Board {
         bool exist;
