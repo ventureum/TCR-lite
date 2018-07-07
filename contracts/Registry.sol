@@ -214,7 +214,7 @@ contract Registry is Ownable {
         to.insert(to.getPrev(bytes32(0x0)), hash, bytes32(0x0));
     }
 
-    function getVoteStartingTimeAndEndingTime(bytes32 hash) public returns (uint startTime, uint endTime) {
+    function getVoteStartingTimeAndEndingTime(bytes32 hash) public view returns (uint startTime, uint endTime) {
         return (polls[hash].startTime, polls[hash].startTime.add(VOTE_DURATION));
     }
 }
