@@ -16,23 +16,26 @@ contract Forum is Ownable {
         bytes32 indexed boardId,
         bytes32 parentHash,
         bytes32 indexed postHash,
-        bytes32 ipfsPath
+        bytes32 ipfsPath,
+        uint timestamp
     );
 
     event UpdatePost (
         address indexed poster,
         bytes32 indexed postHash,
-        bytes32 ipfsPath
+        bytes32 ipfsPath,
+        uint timestamp
     );
 
     event Upvote(
         address indexed upvoter,
         bytes32 indexed boardId,
         bytes32 indexed postHash,
-        uint value
+        uint value,
+        uint timestamp
     );
 
-    event Withdraw(address indexed poster, bytes32 indexed postHash, uint rewards);
+    event Withdraw(address indexed poster, bytes32 indexed postHash, uint rewards, uint timestamp);
 
     struct Board {
         bool exist;
@@ -102,7 +105,7 @@ contract Forum is Ownable {
             posts.insert(posts.getPrev(bytes32(0x0)), postHash, bytes32(0x0));
         }
 
-        emit Post(msg.sender, boardId, parentHash, postHash, ipfsPath);
+        emit Post(msg.sender, boardId, parentHash, postHash, ipfsPath, now);
     }
 
     function updatePost(
@@ -113,7 +116,7 @@ contract Forum is Ownable {
         require(author[postHash] == msg.sender);
         contents[postHash] = ipfsPath;
 
-        emit UpdatePost(msg.sender, postHash, ipfsPath);
+        emit UpdatePost(msg.sender, postHash, ipfsPath, now);
     }
 
     function upvote(address upvoter, bytes32 postHash, uint value) external {
@@ -128,7 +131,7 @@ contract Forum is Ownable {
 
         rewards[postHash] = rewards[postHash].add(value.sub(fees));
 
-        emit Upvote(upvoter, boardId, postHash, value);
+        emit Upvote(upvoter, boardId, postHash, value, now);
     }
 
     function withdraw(bytes32 postHash) external {
@@ -140,7 +143,7 @@ contract Forum is Ownable {
         bytes32 boardId = fromBoard[postHash];
 
         require(ERC20(boards[boardId].token).transfer(msg.sender, _rewards));
-        emit Withdraw(msg.sender, postHash, _rewards);
+        emit Withdraw(msg.sender, postHash, _rewards, now);
     }
 
     // Utils functions
