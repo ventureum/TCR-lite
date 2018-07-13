@@ -6,11 +6,15 @@ const BigNumber = web3.BigNumber
 // eslint-disable-next-line
 const should = require('chai')
   .use(require('chai-as-promised'))
+  .use(require('chai-string'))
   .use(require('chai-bignumber')(BigNumber))
   .should()
 
 const Forum = artifacts.require('Forum')
 const Token = artifacts.require('VetXToken')
+
+//Mocked data
+const AirdropMock = artifacts.require('AirdropMock')
 
 const boards = [
   '0x0d1d4e623d10f9fba5db95830f7d3839406c6af2000000000000000000000001',
@@ -97,7 +101,11 @@ contract('Basic Tests: ', function ([root, user1, user2, user3, _]) {
   beforeEach(async function () {
     this.token = await Token.new('10000', 'VetX', 18, 'VTX')
     this.forum = await Forum.new()
-    this.proxy = await Proxy.new()
+    this.airdropMockToken = await Token.new('1000000', 'AirdropMockToken', 18, 'AMT')
+    this.airdropMock = await AirdropMock.new(this.airdropMockToken.address)
+
+    //transfer token to AirdropMock contract
+    this.airdropMockToken.transfer(this.airdropMock.address, 1000000)
 
     this.feesPercentage = await this.forum.feesPercentage.call()
     await this.token.transfer(user1, 1000, {from: root})
@@ -110,10 +118,12 @@ contract('Basic Tests: ', function ([root, user1, user2, user3, _]) {
     let TokenWeb3 = web3.eth.contract(this.token.abi)
     let tokenWeb3Instance = TokenWeb3.at(this.token.address)
 
-    this.approveUser2 = tokenWeb3Instance.approve.getData(this.forum.address, 100)
-    this.upvoteUser2 = forumWeb3Instance.upvote.getData(user2, posts[0], 100)
+    let AirdropMockWeb3 = web3.eth.contract(this.airdropMock.abi)
+    let airdropMockWeb3Instance = AirdropMockWeb3.at(this.airdropMock.address)
+    this.airdropMockValidate = airdropMockWeb3Instance.validate.getData()
+    this.airdropMockAirdrop = airdropMockWeb3Instance.airdrop.getData()
   })
-  
+
   describe('Add a board: ', function () {
     it('by owner', async function () {
       await this.forum.addBoard(boards[0], this.token.address).should.be.fulfilled
@@ -148,6 +158,29 @@ contract('Basic Tests: ', function ([root, user1, user2, user3, _]) {
       let content = await this.forum.getContentByHash.call(posts[0])
       content.should.equal(ipfsMultihash[0].digest)
     })
+
+    it('Post a new airdrop topic', async function () {
+      await this.forum.postAirdrop(
+        boards[0],
+        posts[1],
+        ipfsMultihash[0].digest,
+        this.airdropMock.address,
+        this.airdropMockValidate,
+        this.airdropMockAirdrop,
+        {from: user1}).should.be.fulfilled
+
+      const content = await this.forum.getContentByHash.call(posts[1])
+      content.should.equal(ipfsMultihash[0].digest)
+
+      const callAddress = await this.forum.getCallAddressByHash.call(posts[1])
+      callAddress.should.be.equal(this.airdropMock.address)
+
+      const callValidateData = await this.forum.getCallValidateDataByHash.call(posts[1])
+      callValidateData.should.startWith(this.airdropMockValidate)
+
+      const callData = await this.forum.getCallDataByHash.call(posts[1])
+      callData.should.startWith(this.airdropMockAirdrop)
+    })
   })
 
   describe('Update post: ', function () {
@@ -174,8 +207,6 @@ contract('Basic Tests: ', function ([root, user1, user2, user3, _]) {
     })
 
     it('Simple upvote', async function () {
-      await this.proxy.concat(this.approveUser2, this.upvoteUser2, {from: user2})
-      
       await this.token.approve(this.forum.address, 100, {from: user2}).should.be.fulfilled
       await this.forum.upvote(user2, posts[0], 100, {from: user2}).should.be.fulfilled
 
