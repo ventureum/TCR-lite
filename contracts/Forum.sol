@@ -129,6 +129,13 @@ contract Forum is Ownable {
 
     /*
     *  Submit an airdrop event to a board
+    *  It's a post with airdrop event
+    *  (Note: only post but no reply)
+    *  A post with airdrop means user can receive free token by poster's policy
+    *  An user can call:
+    *    airdropContractAddress.callValidateData to check if the user has permission
+    *    airdropContractAddress.callData to trigger airdrop in order to receive free token
+    *       (depend on poster's airdrop policy)
     *
     *  @param boardId hash value of a board id
     *  @param postHash hash value of a post
