@@ -5,6 +5,7 @@ import "openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
 
+
 contract Forum is Ownable {
     using SafeMath for uint;
     using DLLBytes32 for DLLBytes32.Data;
@@ -17,6 +18,18 @@ contract Forum is Ownable {
         bytes32 parentHash,
         bytes32 indexed postHash,
         bytes32 ipfsPath,
+        uint timestamp
+    );
+
+    event PostAirdrop (
+        address indexed poster,
+        bytes32 indexed boardId,
+        bytes32 parentHash,
+        bytes32 indexed postHash,
+        bytes32 ipfsPath,
+        address airdropContractAddress,
+        bytes32 callValidateData,
+        bytes32 callData,
         uint timestamp
     );
 
@@ -44,6 +57,8 @@ contract Forum is Ownable {
         mapping(bytes32 => DLLBytes32.Data) replies;
     }
 
+    address constant NULL = address(0x0);
+
     uint public feesPercentage = 5;
     uint constant BATCH_SIZE = 10;
 
@@ -54,6 +69,10 @@ contract Forum is Ownable {
     mapping(bytes32 => uint) public rewards;
     mapping(bytes32 => bytes32) public fromBoard;
     mapping(bytes32 => uint) public replyLen;
+
+    mapping(bytes32 => address) public callAddresses;
+    mapping(bytes32 => bytes32) public callValidateDatas;
+    mapping(bytes32 => bytes32) public callDatas;
 
     function boardExist(bytes32 boardId) internal view returns (bool) {
         return boards[boardId].exist;
@@ -76,6 +95,43 @@ contract Forum is Ownable {
         boards[boardId].token = token;
 
         emit SetBoardToken(boardId, token);
+    }
+
+    function postAirdrop(
+        bytes32 boardId,
+        bytes32 parentHash,
+        bytes32 postHash,
+        bytes32 ipfsPath,
+        address airdropContractAddress,
+        bytes32 callValidateData,
+        bytes32 callData
+        )
+        external {
+        require(!recordExist(postHash));
+        require(airdropContractAddress != NULL);
+
+        contents[postHash] = ipfsPath;
+        parent[postHash] = parentHash;
+        author[postHash] = msg.sender;
+        fromBoard[postHash] = boardId;
+
+        callAddresses[postHash] = airdropContractAddress;
+        callValidateDatas[postHash] = callValidateData;
+        callDatas[postHash] = callData;
+
+        DLLBytes32.Data storage posts = boards[boardId].posts;
+        posts.insert(posts.getPrev(bytes32(0x0)), postHash, bytes32(0x0));
+
+        emit PostAirdrop(
+            msg.sender, 
+            boardId, 
+            parentHash, 
+            postHash, 
+            ipfsPath, 
+            airdropContractAddress, 
+            callValidateData, 
+            callData, 
+            now);
     }
 
     function post(
@@ -147,6 +203,18 @@ contract Forum is Ownable {
     }
 
     // Utils functions
+
+    function getCallAddressByHash (bytes32 hash) public view returns (address) {
+        return callAddresses[hash];
+    }
+
+    function getCallValidateDataByHash (bytes32 hash) public view returns (bytes32) {
+        return callValidateDatas[hash];
+    }
+
+    function getCallDataByHash (bytes32 hash) public view returns (bytes32) {
+        return callDatas[hash];
+    }
 
     function getContentByHash(bytes32 hash) public view returns (bytes32) {
         return contents[hash];
