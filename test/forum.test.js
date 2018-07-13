@@ -101,7 +101,11 @@ contract('Basic Tests: ', function ([root, user1, user2, user3, _]) {
   beforeEach(async function () {
     this.token = await Token.new('10000', 'VetX', 18, 'VTX')
     this.forum = await Forum.new()
-    this.airdropMock = await AirdropMock.new()
+    this.airdropMockToken = await Token.new('1000000', 'AirdropMockToken', 18, 'AMT')
+    this.airdropMock = await AirdropMock.new(this.airdropMockToken.address)
+
+    //transfer token to AirdropMock contract
+    this.airdropMockToken.transfer(this.airdropMock.address, 1000000)
 
     this.feesPercentage = await this.forum.feesPercentage.call()
     await this.token.transfer(user1, 1000, {from: root})

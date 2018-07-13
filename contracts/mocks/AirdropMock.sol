@@ -1,7 +1,14 @@
 pragma solidity^0.4.24;
 
+import "openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
+
 
 contract AirdropMock {
+    ERC20 public token;
+
+    constructor (address _tokenAddress) {
+        token = ERC20(_tokenAddress);
+    }
 
     // a mocked whitelist
     function whitelisted(address addr) internal view returns (bool) {
@@ -16,6 +23,6 @@ contract AirdropMock {
     function airdrop() external {
         require(whitelisted(msg.sender));
 
-        msg.sender.send(1);
+        token.transfer(msg.sender, 1);
     }
 }
