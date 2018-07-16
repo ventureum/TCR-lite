@@ -1,6 +1,9 @@
 import EVMRevert from 'openzeppelin-solidity/test/helpers/EVMRevert'
 import bs58 from 'bs58'
 
+const Web3 = require('web3')
+const wweb3 = new Web3()
+
 const BigNumber = web3.BigNumber
 
 // eslint-disable-next-line
@@ -40,6 +43,8 @@ const ipfsPaths = [
   'QmTkzDwWqPbnAh5YiV5VwcTLnGdwSNsNTn2aDxdXBFca7D']
 
 const ipfsMultihash = []
+
+const AIRDROP_REWARD = 1
 
 /**
  * Partition multihash string into object representing multihash
@@ -108,6 +113,7 @@ contract('Basic Tests: ', function ([root, user1, user2, user3, _]) {
     this.airdropMockToken.transfer(this.airdropMock.address, 1000000)
 
     this.feesPercentage = await this.forum.feesPercentage.call()
+    console.log(user1)
     await this.token.transfer(user1, 1000, {from: root})
     await this.token.transfer(user2, 500, {from: root})
     await this.token.transfer(user3, 500, {from: root})
@@ -120,8 +126,8 @@ contract('Basic Tests: ', function ([root, user1, user2, user3, _]) {
 
     let AirdropMockWeb3 = web3.eth.contract(this.airdropMock.abi)
     let airdropMockWeb3Instance = AirdropMockWeb3.at(this.airdropMock.address)
-    this.airdropMockValidate = airdropMockWeb3Instance.validate.getData()
-    this.airdropMockAirdrop = airdropMockWeb3Instance.airdrop.getData()
+    this.airdropMockValidate = wweb3.eth.abi.encodeFunctionSignature('validate(address)')
+    this.airdropMockAirdrop = wweb3.eth.abi.encodeFunctionSignature('airdrop(address)')
   })
 
   describe('Add a board: ', function () {
@@ -154,7 +160,12 @@ contract('Basic Tests: ', function ([root, user1, user2, user3, _]) {
     })
 
     it('Post a new topic', async function () {
-      await this.forum.post(boards[0], web3.toHex(0), posts[0], ipfsMultihash[0].digest, {from: user1}).should.be.fulfilled
+      await this.forum.post(
+        boards[0],
+        web3.toHex(0),
+        posts[0],
+        ipfsMultihash[0].digest,
+        {from: user1}).should.be.fulfilled
       let content = await this.forum.getContentByHash.call(posts[0])
       content.should.equal(ipfsMultihash[0].digest)
     })
@@ -172,14 +183,37 @@ contract('Basic Tests: ', function ([root, user1, user2, user3, _]) {
       const content = await this.forum.getContentByHash.call(posts[1])
       content.should.equal(ipfsMultihash[0].digest)
 
-      const callAddress = await this.forum.getCallAddressByHash.call(posts[1])
+      const callAddress = await this.forum.getCallAddressByHash(posts[1])
       callAddress.should.be.equal(this.airdropMock.address)
 
       const callValidateData = await this.forum.getCallValidateDataByHash.call(posts[1])
-      callValidateData.should.startWith(this.airdropMockValidate)
+      callValidateData.should.equal(this.airdropMockValidate)
 
       const callData = await this.forum.getCallDataByHash.call(posts[1])
-      callData.should.startWith(this.airdropMockAirdrop)
+      callData.should.equal(this.airdropMockAirdrop)
+    })
+
+    it('Validate and Airdrop a airdrop post topic', async function () {
+      await this.forum.postAirdrop(
+        boards[0],
+        posts[2],
+        ipfsMultihash[0].digest,
+        this.airdropMock.address,
+        this.airdropMockValidate,
+        this.airdropMockAirdrop).should.be.fulfilled
+      const validate = await this.forum.airdropValidate(posts[2], {from: user2})
+      validate.should.be.equal(true)
+
+      const preBal = await this.airdropMockToken.balanceOf(user2).should.be.fulfilled
+      const preBalAirdropMock = await this.airdropMockToken.balanceOf(this.airdropMock.address)
+        .should.be.fulfilled
+      await this.forum.airdropCall(posts[2], {from: user2})
+      const postBal = await this.airdropMockToken.balanceOf(user2).should.be.fulfilled
+      const postBalAirdropMock = await this.airdropMockToken.balanceOf(this.airdropMock.address)
+        .should.be.fulfilled
+
+      postBal.minus(preBal).should.be.bignumber.equal(AIRDROP_REWARD)
+      preBalAirdropMock.minus(postBalAirdropMock).should.be.bignumber.equal(AIRDROP_REWARD)
     })
   })
 

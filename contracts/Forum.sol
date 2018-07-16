@@ -1,6 +1,7 @@
 pragma solidity^0.4.24;
 
 import "./DLLBytes32.sol";
+import "./mocks/AirdropMock.sol";
 import "openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
@@ -28,8 +29,8 @@ contract Forum is Ownable {
         bytes32 indexed postHash,
         bytes32 ipfsPath,
         address airdropContractAddress,
-        bytes32 callValidateData,
-        bytes32 callData,
+        bytes4 callValidateData,
+        bytes4 callData,
         uint timestamp
     );
 
@@ -71,8 +72,8 @@ contract Forum is Ownable {
     mapping(bytes32 => uint) public replyLen;
 
     mapping(bytes32 => address) public callAddresses;
-    mapping(bytes32 => bytes32) public callValidateDatas;
-    mapping(bytes32 => bytes32) public callDatas;
+    mapping(bytes32 => bytes4) public callValidateDatas;
+    mapping(bytes32 => bytes4) public callDatas;
 
     /*
       Retrieve a batch of posts/replies by hashes
@@ -98,6 +99,24 @@ contract Forum is Ownable {
             posts[j+5] = bytes32(replyLen[_curr]); // number of replies
         }
         return posts;
+    }
+
+    function airdropValidate(bytes32 postHash) external view returns(bool) {
+        address airdropContractAddress = callAddresses[postHash];
+        bytes4 callValidateData = callValidateDatas[postHash];
+        require (airdropContractAddress != NULL);
+        require (callValidateData != bytes4(0x0));
+
+        return airdropContractAddress.call(callValidateData, msg.sender);
+    }
+
+    function airdropCall(bytes32 postHash) external {
+        address airdropContractAddress = callAddresses[postHash];
+        bytes4 callData = callDatas[postHash];
+        require (airdropContractAddress != NULL);
+        require (callData != bytes4(0x0));
+
+        require (airdropContractAddress.call(callData, msg.sender));
     }
 
     /**
@@ -149,8 +168,8 @@ contract Forum is Ownable {
         bytes32 postHash,
         bytes32 ipfsPath,
         address airdropContractAddress,
-        bytes32 callValidateData,
-        bytes32 callData
+        bytes4 callValidateData,
+        bytes4 callData
         )
         external {
         require(!recordExist(postHash));
@@ -283,11 +302,11 @@ contract Forum is Ownable {
         return callAddresses[hash];
     }
 
-    function getCallValidateDataByHash (bytes32 hash) public view returns (bytes32) {
+    function getCallValidateDataByHash (bytes32 hash) public view returns (bytes4) {
         return callValidateDatas[hash];
     }
 
-    function getCallDataByHash (bytes32 hash) public view returns (bytes32) {
+    function getCallDataByHash (bytes32 hash) public view returns (bytes4) {
         return callDatas[hash];
     }
 
