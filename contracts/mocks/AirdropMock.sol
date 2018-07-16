@@ -6,6 +6,8 @@ import "openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
 contract AirdropMock {
     ERC20 public token;
 
+    address constant NULL = address(0x0);
+
     constructor (address _tokenAddress) {
         token = ERC20(_tokenAddress);
     }
@@ -15,14 +17,16 @@ contract AirdropMock {
         return true;
     }
 
-    function validate() external view returns (bool) {
-        return whitelisted(msg.sender);
+    function validate(address targetAddress) external view {
+        require(targetAddress != NULL);
+        require(whitelisted(targetAddress));
     }
 
     // for test reason, transfer 1 ether to target user.
-    function airdrop() external {
-        require(whitelisted(msg.sender));
+    function airdrop(address targetAddress) external {
+        require(targetAddress != NULL);
+        require(whitelisted(targetAddress));
 
-        token.transfer(msg.sender, 1);
+        token.transfer(targetAddress, 1);
     }
 }
