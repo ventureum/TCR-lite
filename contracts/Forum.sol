@@ -29,8 +29,8 @@ contract Forum is Ownable {
         bytes32 indexed postHash,
         bytes32 ipfsPath,
         address airdropContractAddress,
-        bytes4 callValidateData,
-        bytes4 callData,
+        bytes4 callValidateSig,
+        bytes4 callAirdropSig,
         uint timestamp
     );
 
@@ -72,8 +72,10 @@ contract Forum is Ownable {
     mapping(bytes32 => uint) public replyLen;
 
     mapping(bytes32 => address) public callAddresses;
-    mapping(bytes32 => bytes4) public callValidateDatas;
-    mapping(bytes32 => bytes4) public callDatas;
+    // store the validate function sigs
+    mapping(bytes32 => bytes4) public callValidateSigs;
+    // store the airdrop function sigs
+    mapping(bytes32 => bytes4) public callAirdropSigs;
 
     /*
       Retrieve a batch of posts/replies by hashes
@@ -101,22 +103,35 @@ contract Forum is Ownable {
         return posts;
     }
 
+    /*
+     *Check if the sender(msg.sender) can receive airdrop(free token)
+     *
+     *@param hashes hash array of posts/replies to be retrieved
+     *@returns bool show if sender can receive airdrop
+     */
     function airdropValidate(bytes32 postHash) external view returns(bool) {
         address airdropContractAddress = callAddresses[postHash];
-        bytes4 callValidateData = callValidateDatas[postHash];
+        bytes4 callValidateSig = callValidateSigs[postHash];
         require (airdropContractAddress != NULL);
-        require (callValidateData != bytes4(0x0));
+        require (callValidateSig != bytes4(0x0));
 
-        return airdropContractAddress.call(callValidateData, msg.sender);
+        return airdropContractAddress.call(callValidateSig, msg.sender);
     }
 
+    /*
+     * Call airdrop function that poster provide. 
+     * More behavior depends on the airdrop function that poster provider 
+     *  (usually the airdrop function will check sender's permission for airdrop)
+     *
+     * @param hashes hash array of posts/replies to be retrieved
+     */
     function airdropCall(bytes32 postHash) external {
         address airdropContractAddress = callAddresses[postHash];
-        bytes4 callData = callDatas[postHash];
+        bytes4 callAirdropSig = callAirdropSigs[postHash];
         require (airdropContractAddress != NULL);
-        require (callData != bytes4(0x0));
+        require (callAirdropSig != bytes4(0x0));
 
-        require (airdropContractAddress.call(callData, msg.sender));
+        require (airdropContractAddress.call(callAirdropSig, msg.sender));
     }
 
     /**
@@ -152,24 +167,24 @@ contract Forum is Ownable {
     *  (Note: only post but no reply)
     *  A post with airdrop means user can receive free token by poster's policy
     *  An user can call:
-    *    airdropContractAddress.callValidateData to check if the user has permission
-    *    airdropContractAddress.callData to trigger airdrop in order to receive free token
+    *    airdropContractAddress.callValidateSig to check if the user has permission
+    *    airdropContractAddress.callAirdropSig to trigger airdrop in order to receive free token
     *       (depend on poster's airdrop policy)
     *
     *  @param boardId hash value of a board id
     *  @param postHash hash value of a post
     *  @param ipfsPath hash value of ipfs file
     *  @param airdropContractAddress airdrop contract address
-    *  @param callValidateData calldata for validate function at airdrop contract
-    *  @param callData calldata at airdrop contract
+    *  @param callValidateSig calldata for validate function at airdrop contract
+    *  @param callAirdropSig calldata at airdrop contract
     */
     function postAirdrop(
         bytes32 boardId,
         bytes32 postHash,
         bytes32 ipfsPath,
         address airdropContractAddress,
-        bytes4 callValidateData,
-        bytes4 callData
+        bytes4 callValidateSig,
+        bytes4 callAirdropSig
         )
         external {
         require(!recordExist(postHash));
@@ -181,8 +196,8 @@ contract Forum is Ownable {
         fromBoard[postHash] = boardId;
 
         callAddresses[postHash] = airdropContractAddress;
-        callValidateDatas[postHash] = callValidateData;
-        callDatas[postHash] = callData;
+        callValidateSigs[postHash] = callValidateSig;
+        callAirdropSigs[postHash] = callAirdropSig;
 
         DLLBytes32.Data storage posts = boards[boardId].posts;
         posts.insert(posts.getPrev(bytes32(0x0)), postHash, bytes32(0x0));
@@ -193,8 +208,8 @@ contract Forum is Ownable {
             postHash, 
             ipfsPath, 
             airdropContractAddress, 
-            callValidateData, 
-            callData, 
+            callValidateSig, 
+            callAirdropSig, 
             now);
     }
 
@@ -302,12 +317,12 @@ contract Forum is Ownable {
         return callAddresses[hash];
     }
 
-    function getCallValidateDataByHash (bytes32 hash) public view returns (bytes4) {
-        return callValidateDatas[hash];
+    function getCallValidateSigByHash (bytes32 hash) public view returns (bytes4) {
+        return callValidateSigs[hash];
     }
 
-    function getCallDataByHash (bytes32 hash) public view returns (bytes4) {
-        return callDatas[hash];
+    function getCallAirdropSigByHash (bytes32 hash) public view returns (bytes4) {
+        return callSigs[hash];
     }
 
     function getContentByHash(bytes32 hash) public view returns (bytes32) {

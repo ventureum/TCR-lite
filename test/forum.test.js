@@ -101,115 +101,121 @@ function calculateFees (feesPercentage, val) {
   return val.times(feesPercentage).div(new BigNumber(100))
 }
 
+let token
+let forum
+let airdropMockToken
+let airdropMock
+let airdropMockValidate
+let airdropMockAirdrop
+let feesPercentage
 
 contract('Basic Tests: ', function ([root, user1, user2, user3, _]) {
   beforeEach(async function () {
-    this.token = await Token.new('10000', 'VetX', 18, 'VTX')
-    this.forum = await Forum.new()
-    this.airdropMockToken = await Token.new('1000000', 'AirdropMockToken', 18, 'AMT')
-    this.airdropMock = await AirdropMock.new(this.airdropMockToken.address)
+    token = await Token.new('10000', 'VetX', 18, 'VTX')
+    forum = await Forum.new()
+    airdropMockToken = await Token.new('1000000', 'AirdropMockToken', 18, 'AMT')
+    airdropMock = await AirdropMock.new(airdropMockToken.address)
 
     //transfer token to AirdropMock contract
-    this.airdropMockToken.transfer(this.airdropMock.address, 1000000)
+    airdropMockToken.transfer(airdropMock.address, 1000000)
 
-    this.feesPercentage = await this.forum.feesPercentage.call()
-    console.log(user1)
-    await this.token.transfer(user1, 1000, {from: root})
-    await this.token.transfer(user2, 500, {from: root})
-    await this.token.transfer(user3, 500, {from: root})
+    feesPercentage = await forum.feesPercentage.call()
+    await token.transfer(user1, 1000, {from: root})
+    await token.transfer(user2, 500, {from: root})
+    await token.transfer(user3, 500, {from: root})
 
-    let ForumWeb3 = web3.eth.contract(this.forum.abi)
-    let forumWeb3Instance = ForumWeb3.at(this.forum.address)
+    let ForumWeb3 = web3.eth.contract(forum.abi)
+    let forumWeb3Instance = ForumWeb3.at(forum.address)
 
-    let TokenWeb3 = web3.eth.contract(this.token.abi)
-    let tokenWeb3Instance = TokenWeb3.at(this.token.address)
+    let TokenWeb3 = web3.eth.contract(token.abi)
+    let tokenWeb3Instance = TokenWeb3.at(token.address)
 
-    let AirdropMockWeb3 = web3.eth.contract(this.airdropMock.abi)
-    let airdropMockWeb3Instance = AirdropMockWeb3.at(this.airdropMock.address)
-    this.airdropMockValidate = wweb3.eth.abi.encodeFunctionSignature('validate(address)')
-    this.airdropMockAirdrop = wweb3.eth.abi.encodeFunctionSignature('airdrop(address)')
+    let AirdropMockWeb3 = web3.eth.contract(airdropMock.abi)
+    let airdropMockWeb3Instance = AirdropMockWeb3.at(airdropMock.address)
+    airdropMockValidate = wweb3.eth.abi.encodeFunctionSignature('validate(address)')
+    airdropMockAirdrop = wweb3.eth.abi.encodeFunctionSignature('airdrop(address)')
   })
 
   describe('Add a board: ', function () {
     it('by owner', async function () {
-      await this.forum.addBoard(boards[0], this.token.address).should.be.fulfilled
+      await forum.addBoard(boards[0], token.address).should.be.fulfilled
     })
 
     it('by non-owner', async function () {
-      await this.forum.addBoard(boards[0], this.token.address, {from: user1}).should.be.rejectedWith(EVMRevert)
+      await forum.addBoard(boards[0], token.address, {from: user1}).should.be.rejectedWith(EVMRevert)
     })
   })
 
   describe('Set board tokens: ', function () {
     beforeEach(async function () {
-      await this.forum.addBoard(boards[0], this.token.address).should.be.fulfilled
+      await forum.addBoard(boards[0], token.address).should.be.fulfilled
     })
 
     it('by owner', async function () {
-      await this.forum.setBoardToken(boards[0], this.token.address).should.be.fulfilled
+      await forum.setBoardToken(boards[0], token.address).should.be.fulfilled
     })
 
     it('by non-owner', async function () {
-      await this.forum.setBoardToken(boards[0], this.token.address, {from: user1}).should.be.rejectedWith(EVMRevert)
+      await forum.setBoardToken(boards[0], token.address, {from: user1}).should.be.rejectedWith(EVMRevert)
     })
   })
 
   describe('Post: ', function () {
     beforeEach(async function () {
-      await this.forum.addBoard(boards[0], this.token.address).should.be.fulfilled
+      await forum.addBoard(boards[0], token.address).should.be.fulfilled
     })
 
     it('Post a new topic', async function () {
-      await this.forum.post(
+      await forum.post(
         boards[0],
         web3.toHex(0),
         posts[0],
         ipfsMultihash[0].digest,
         {from: user1}).should.be.fulfilled
-      let content = await this.forum.getContentByHash.call(posts[0])
+      let content = await forum.getContentByHash.call(posts[0])
       content.should.equal(ipfsMultihash[0].digest)
     })
 
     it('Post a new airdrop topic', async function () {
-      await this.forum.postAirdrop(
+      await forum.postAirdrop(
         boards[0],
         posts[1],
         ipfsMultihash[0].digest,
-        this.airdropMock.address,
-        this.airdropMockValidate,
-        this.airdropMockAirdrop,
+        airdropMock.address,
+        airdropMockValidate,
+        airdropMockAirdrop,
         {from: user1}).should.be.fulfilled
 
-      const content = await this.forum.getContentByHash.call(posts[1])
+      const content = await forum.getContentByHash.call(posts[1])
       content.should.equal(ipfsMultihash[0].digest)
 
-      const callAddress = await this.forum.getCallAddressByHash(posts[1])
-      callAddress.should.be.equal(this.airdropMock.address)
+      const callAddress = await forum.getCallAddressByHash(posts[1])
+      callAddress.should.be.equal(airdropMock.address)
 
-      const callValidateData = await this.forum.getCallValidateDataByHash.call(posts[1])
-      callValidateData.should.equal(this.airdropMockValidate)
+      const callValidateSig = await forum.getCallValidateSigByHash.call(posts[1])
+      callValidateSig.should.equal(airdropMockValidate)
 
-      const callData = await this.forum.getCallDataByHash.call(posts[1])
-      callData.should.equal(this.airdropMockAirdrop)
+      const callAirdropSig = await forum.getCallAirdropSigByHash.call(posts[1])
+      callAirdropSig.should.equal(airdropMockAirdrop)
     })
 
     it('Validate and Airdrop a airdrop post topic', async function () {
-      await this.forum.postAirdrop(
+      await forum.postAirdrop(
         boards[0],
         posts[2],
         ipfsMultihash[0].digest,
-        this.airdropMock.address,
-        this.airdropMockValidate,
-        this.airdropMockAirdrop).should.be.fulfilled
-      const validate = await this.forum.airdropValidate(posts[2], {from: user2})
+        airdropMock.address,
+        airdropMockValidate,
+        airdropMockAirdrop).should.be.fulfilled
+      const validate = await forum.airdropValidate(posts[2], {from: user2})
       validate.should.be.equal(true)
 
-      const preBal = await this.airdropMockToken.balanceOf(user2).should.be.fulfilled
-      const preBalAirdropMock = await this.airdropMockToken.balanceOf(this.airdropMock.address)
+      const preBal = await airdropMockToken.balanceOf(user2).should.be.fulfilled
+      const preBalAirdropMock = await airdropMockToken.balanceOf(airdropMock.address)
         .should.be.fulfilled
-      await this.forum.airdropCall(posts[2], {from: user2})
-      const postBal = await this.airdropMockToken.balanceOf(user2).should.be.fulfilled
-      const postBalAirdropMock = await this.airdropMockToken.balanceOf(this.airdropMock.address)
+      await forum.airdropCall(posts[2], {from: user2})
+      const postBal = await airdropMockToken.balanceOf(user2).should.be.fulfilled
+      const postBalAirdropMock = await airdropMockToken.balanceOf(airdropMock.address)
         .should.be.fulfilled
 
       postBal.minus(preBal).should.be.bignumber.equal(AIRDROP_REWARD)
@@ -219,80 +225,82 @@ contract('Basic Tests: ', function ([root, user1, user2, user3, _]) {
 
   describe('Update post: ', function () {
     beforeEach(async function () {
-      await this.forum.addBoard(boards[0], this.token.address).should.be.fulfilled
-      await this.forum.post(boards[0], web3.toHex(0), posts[0], ipfsMultihash[0].digest, {from: user1}).should.be.fulfilled
+      await forum.addBoard(boards[0], token.address).should.be.fulfilled
+      await forum.post(boards[0], web3.toHex(0), posts[0], ipfsMultihash[0].digest, {from: user1}).should.be.fulfilled
     })
 
     it('Update post by poster', async function () {
-      await this.forum.updatePost(posts[0], ipfsMultihash[1].digest, {from: user1}).should.be.fulfilled
-      let content = await this.forum.getContentByHash.call(posts[0])
+      await forum.updatePost(posts[0], ipfsMultihash[1].digest, {from: user1}).should.be.fulfilled
+      let content = await forum.getContentByHash.call(posts[0])
       content.should.equal(ipfsMultihash[1].digest)
     })
 
     it('Update post by non original poster', async function () {
-      await this.forum.updatePost(posts[0], ipfsMultihash[2].digest, {from: user2}).should.be.rejectedWith(EVMRevert)
+      await forum.updatePost(posts[0], ipfsMultihash[2].digest, {from: user2}).should.be.rejectedWith(EVMRevert)
     })
   })
 
   describe('Upvote post: ', function () {
     beforeEach(async function () {
-      await this.forum.addBoard(boards[0], this.token.address).should.be.fulfilled
-      await this.forum.post(boards[0], web3.toHex(0), posts[0], ipfsMultihash[0].digest, {from: user1}).should.be.fulfilled
+      await forum.addBoard(boards[0], token.address).should.be.fulfilled
+      await forum.post(boards[0], web3.toHex(0), posts[0], ipfsMultihash[0].digest, {from: user1}).should.be.fulfilled
     })
 
     it('Simple upvote', async function () {
-      await this.token.approve(this.forum.address, 100, {from: user2}).should.be.fulfilled
-      await this.forum.upvote(user2, posts[0], 100, {from: user2}).should.be.fulfilled
+      await token.approve(forum.address, 100, {from: user2}).should.be.fulfilled
+      await forum.upvote(user2, posts[0], 100, {from: user2}).should.be.fulfilled
 
-      let rewards = await this.forum.rewards.call(posts[0])
-      rewards.should.be.bignumber.equal(new BigNumber(100).sub(calculateFees(this.feesPercentage,
+      let rewards = await forum.rewards.call(posts[0])
+      rewards.should.be.bignumber.equal(new BigNumber(100).sub(calculateFees(feesPercentage,
         new BigNumber(100))))
     })
   })
 
   describe('Withdraw rewards: ', function () {
     beforeEach(async function () {
-      await this.forum.addBoard(boards[0], this.token.address).should.be.fulfilled
-      await this.forum.post(boards[0], web3.toHex(0), posts[0], ipfsMultihash[0].digest, {from: user1}).should.be.fulfilled
-      await this.token.approve(this.forum.address, 100, {from: user2}).should.be.fulfilled
-      await this.forum.upvote(user2, posts[0], 100, {from: user2}).should.be.fulfilled
+      await forum.addBoard(boards[0], token.address).should.be.fulfilled
+      await forum.post(boards[0], web3.toHex(0), posts[0], ipfsMultihash[0].digest, {from: user1}).should.be.fulfilled
+      await token.approve(forum.address, 100, {from: user2}).should.be.fulfilled
+      await forum.upvote(user2, posts[0], 100, {from: user2}).should.be.fulfilled
     })
 
     it('Simple withdraw', async function () {
-      let rewards = await this.forum.rewards.call(posts[0])
-      let preBal = await this.token.balanceOf.call(user1).should.be.fulfilled
-      await this.forum.withdraw(posts[0], {from: user1}).should.be.fulfilled
-      let bal = await this.token.balanceOf.call(user1).should.be.fulfilled
+      let rewards = await forum.rewards.call(posts[0])
+      let preBal = await token.balanceOf.call(user1).should.be.fulfilled
+      await forum.withdraw(posts[0], {from: user1}).should.be.fulfilled
+      let bal = await token.balanceOf.call(user1).should.be.fulfilled
       bal.sub(preBal).should.be.bignumber.equal(rewards)
     })
   })
 
   describe('Batch read: ', function () {
+    let repliesLen
+
     beforeEach(async function () {
-      await this.forum.addBoard(boards[0], this.token.address).should.be.fulfilled
-      await this.forum.post(boards[0], web3.toHex(0), posts[0], ipfsMultihash[0].digest, {from: user1}).should.be.fulfilled
-      await this.forum.post(boards[0], web3.toHex(0), posts[1], ipfsMultihash[1].digest, {from: user1}).should.be.fulfilled
-      await this.forum.post(boards[0], web3.toHex(0), posts[2], ipfsMultihash[2].digest, {from: user1}).should.be.fulfilled
+      await forum.addBoard(boards[0], token.address).should.be.fulfilled
+      await forum.post(boards[0], web3.toHex(0), posts[0], ipfsMultihash[0].digest, {from: user1}).should.be.fulfilled
+      await forum.post(boards[0], web3.toHex(0), posts[1], ipfsMultihash[1].digest, {from: user1}).should.be.fulfilled
+      await forum.post(boards[0], web3.toHex(0), posts[2], ipfsMultihash[2].digest, {from: user1}).should.be.fulfilled
 
       // replies
-      await this.forum.post(boards[0], posts[0], replies[0], ipfsMultihash[0].digest, {from: user1}).should.be.fulfilled
+      await forum.post(boards[0], posts[0], replies[0], ipfsMultihash[0].digest, {from: user1}).should.be.fulfilled
 
-      await this.forum.post(boards[0], posts[1], replies[1], ipfsMultihash[0].digest, {from: user1}).should.be.fulfilled
-      await this.forum.post(boards[0], posts[1], replies[2], ipfsMultihash[0].digest, {from: user1}).should.be.fulfilled
+      await forum.post(boards[0], posts[1], replies[1], ipfsMultihash[0].digest, {from: user1}).should.be.fulfilled
+      await forum.post(boards[0], posts[1], replies[2], ipfsMultihash[0].digest, {from: user1}).should.be.fulfilled
 
-      await this.forum.post(boards[0], posts[2], replies[3], ipfsMultihash[0].digest, {from: user1}).should.be.fulfilled
-      await this.forum.post(boards[0], posts[2], replies[4], ipfsMultihash[1].digest, {from: user1}).should.be.fulfilled
-      await this.forum.post(boards[0], posts[2], replies[5], ipfsMultihash[2].digest, {from: user1}).should.be.fulfilled
+      await forum.post(boards[0], posts[2], replies[3], ipfsMultihash[0].digest, {from: user1}).should.be.fulfilled
+      await forum.post(boards[0], posts[2], replies[4], ipfsMultihash[1].digest, {from: user1}).should.be.fulfilled
+      await forum.post(boards[0], posts[2], replies[5], ipfsMultihash[2].digest, {from: user1}).should.be.fulfilled
 
-      this.repliesLen = [1, 2, 3]
+      repliesLen = [1, 2, 3]
     })
 
     it('getBatchPosts', async function () {
-      let _posts = await this.forum.getBatchPosts.call(posts).should.be.fulfilled
+      let _posts = await forum.getBatchPosts.call(posts).should.be.fulfilled
       let len = 6
       for (let i = 0; i < 3; i++) {
         let k = i * len
-        let tokenAddr = this.token.address.substr(2)
+        let tokenAddr = token.address.substr(2)
         let userAddr = user1.substr(2)
         tokenAddr = '0x' + tokenAddr.padStart(64, '0')
         userAddr = '0x' + userAddr.padStart(64, '0')
@@ -301,19 +309,19 @@ contract('Basic Tests: ', function ([root, user1, user2, user3, _]) {
         _posts[k + 2].should.equal(ipfsMultihash[i].digest)
         _posts[k + 3].should.equal(userAddr)
         web3.toBigNumber(_posts[k + 4]).should.be.bignumber.equal(new BigNumber(0))
-        web3.toBigNumber(_posts[k + 5]).should.be.bignumber.equal(new BigNumber(this.repliesLen[i]))
+        web3.toBigNumber(_posts[k + 5]).should.be.bignumber.equal(new BigNumber(repliesLen[i]))
       }
     })
   })
 
   describe('Get board token: ', function () {
     beforeEach(async function () {
-      await this.forum.addBoard(boards[0], this.token.address).should.be.fulfilled
+      await forum.addBoard(boards[0], token.address).should.be.fulfilled
     })
 
     it('getBoardToken', async function () {
-      let token = await this.forum.getBoardToken.call(boards[0])
-      token.should.equal(this.token.address)
+      const tokenRes = await forum.getBoardToken.call(boards[0])
+      tokenRes.should.equal(token.address)
     })
   })
 })
