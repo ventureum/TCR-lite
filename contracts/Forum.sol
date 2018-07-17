@@ -14,20 +14,24 @@ contract Forum is Ownable {
 
     event AddBoard(bytes32 indexed boardId, address token);
     event SetBoardToken(bytes32 indexed boardId, address token);
+
+    /*
+      @param typeHash bytes4(keccak256([TYPE]))
+      Type = [ POST | COMMENT | AUDIT | AIRDROP ]
+     */
     event Post (
         address indexed poster,
         bytes32 indexed boardId,
         bytes32 parentHash,
         bytes32 indexed postHash,
         bytes32 ipfsPath,
+        bytes4 typeHash,
         uint timestamp
     );
 
     event PostAirdrop (
         address indexed poster,
-        bytes32 indexed boardId,
         bytes32 indexed postHash,
-        bytes32 ipfsPath,
         address airdropContractAddress,
         bytes4 callValidateSig,
         bytes4 callAirdropSig,
@@ -70,8 +74,9 @@ contract Forum is Ownable {
     mapping(bytes32 => uint) public rewards;
     mapping(bytes32 => bytes32) public fromBoard;
     mapping(bytes32 => uint) public replyLen;
+    mapping(bytes32 => bytes4) public _type;
 
-    mapping(bytes32 => address) public callAddresses;
+    mapping(bytes32 => address) public callAddresses; 
     // store the validate function sigs
     mapping(bytes32 => bytes4) public callValidateSigs;
     // store the airdrop function sigs
@@ -89,16 +94,17 @@ contract Forum is Ownable {
         returns (bytes32[]) {
 
         bytes32 _curr;
-        bytes32[] memory posts = new bytes32[](BATCH_SIZE * 6);
-        for(uint i = 0; i < hashes.length; i ++) {
+        bytes32[] memory posts = new bytes32[](BATCH_SIZE * 7);
+        for(uint i = 0; i < hashes.length; i++) {
             _curr = hashes[i];
-            uint j = i * 6;
+            uint j = i * 7;
             posts[j] = _curr; // hash
             posts[j+1] = bytes32(boards[fromBoard[_curr]].token); // associated token address
             posts[j+2] = contents[_curr]; // IPFS hash
             posts[j+3] = bytes32(author[_curr]);  // author
             posts[j+4] = bytes32(rewards[_curr]);  // rewards
             posts[j+5] = bytes32(replyLen[_curr]); // number of replies
+            posts[j+6] = bytes32(_type[_curr]); // type of the post
         }
         return posts;
     }
@@ -162,51 +168,34 @@ contract Forum is Ownable {
     }
 
     /*
-    *  Submit an airdrop event to a board
-    *  It's a post with airdrop event
-    *  (Note: only post but no reply)
+    *  Assicoate an airdrop event with a post
     *  A post with airdrop means user can receive free token by poster's policy
     *  An user can call:
     *    airdropContractAddress.callValidateSig to check if the user has permission
     *    airdropContractAddress.callAirdropSig to trigger airdrop in order to receive free token
     *       (depend on poster's airdrop policy)
     *
-    *  @param boardId hash value of a board id
     *  @param postHash hash value of a post
-    *  @param ipfsPath hash value of ipfs file
     *  @param airdropContractAddress airdrop contract address
     *  @param callValidateSig calldata for validate function at airdrop contract
     *  @param callAirdropSig calldata at airdrop contract
     */
     function postAirdrop(
-        bytes32 boardId,
         bytes32 postHash,
-        bytes32 ipfsPath,
         address airdropContractAddress,
         bytes4 callValidateSig,
         bytes4 callAirdropSig
         )
         external {
-        require(!recordExist(postHash));
         require(airdropContractAddress != NULL);
-
-        contents[postHash] = ipfsPath;
-        parent[postHash] = bytes32(0x0);
-        author[postHash] = msg.sender;
-        fromBoard[postHash] = boardId;
 
         callAddresses[postHash] = airdropContractAddress;
         callValidateSigs[postHash] = callValidateSig;
         callAirdropSigs[postHash] = callAirdropSig;
 
-        DLLBytes32.Data storage posts = boards[boardId].posts;
-        posts.insert(posts.getPrev(bytes32(0x0)), postHash, bytes32(0x0));
-
         emit PostAirdrop(
             msg.sender, 
-            boardId, 
             postHash, 
-            ipfsPath, 
             airdropContractAddress, 
             callValidateSig, 
             callAirdropSig, 
@@ -225,7 +214,8 @@ contract Forum is Ownable {
         bytes32 boardId,
         bytes32 parentHash,
         bytes32 postHash,
-        bytes32 ipfsPath
+        bytes32 ipfsPath,
+        bytes4 typeHash
         )
         external {
         require(!recordExist(postHash));
@@ -234,6 +224,7 @@ contract Forum is Ownable {
         parent[postHash] = parentHash;
         author[postHash] = msg.sender;
         fromBoard[postHash] = boardId;
+        _type[postHash] = typeHash;
 
         if (parentHash != bytes32(0x0)) {
             // reply
@@ -248,7 +239,7 @@ contract Forum is Ownable {
             posts.insert(posts.getPrev(bytes32(0x0)), postHash, bytes32(0x0));
         }
 
-        emit Post(msg.sender, boardId, parentHash, postHash, ipfsPath, now);
+        emit Post(msg.sender, boardId, parentHash, postHash, ipfsPath, typeHash, now);
     }
 
     /*
