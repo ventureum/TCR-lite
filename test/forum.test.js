@@ -1,9 +1,6 @@
 import EVMRevert from 'openzeppelin-solidity/test/helpers/EVMRevert'
 import bs58 from 'bs58'
 
-const Web3 = require('web3')
-const wweb3 = new Web3()
-
 const BigNumber = web3.BigNumber
 
 // eslint-disable-next-line
@@ -124,16 +121,10 @@ contract('Basic Tests: ', function ([root, user1, user2, user3, _]) {
     await token.transfer(user2, 500, {from: root})
     await token.transfer(user3, 500, {from: root})
 
-    let ForumWeb3 = web3.eth.contract(forum.abi)
-    let forumWeb3Instance = ForumWeb3.at(forum.address)
-
-    let TokenWeb3 = web3.eth.contract(token.abi)
-    let tokenWeb3Instance = TokenWeb3.at(token.address)
-
     let AirdropMockWeb3 = web3.eth.contract(airdropMock.abi)
     let airdropMockWeb3Instance = AirdropMockWeb3.at(airdropMock.address)
-    airdropMockValidate = wweb3.eth.abi.encodeFunctionSignature('validate(address)')
-    airdropMockAirdrop = wweb3.eth.abi.encodeFunctionSignature('airdrop(address)')
+    airdropMockValidate = airdropMockWeb3Instance.validate.getData("0x0").slice(0, 10)
+    airdropMockAirdrop = airdropMockWeb3Instance.airdrop.getData("0x0").slice(0, 10)
   })
 
   describe('Add a board: ', function () {

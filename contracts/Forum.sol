@@ -322,7 +322,7 @@ contract Forum is Ownable {
     }
 
     function getCallAirdropSigByHash (bytes32 hash) public view returns (bytes4) {
-        return callSigs[hash];
+        return callAirdropSigs[hash];
     }
 
     function getContentByHash(bytes32 hash) public view returns (bytes32) {
