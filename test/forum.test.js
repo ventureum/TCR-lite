@@ -37,6 +37,9 @@ const ipfsPaths = [
 const ipfsMultihash = []
 
 const POST = web3.sha3('POST').substring(0, 10)
+const COMMENT = web3.sha3('COMMENT').substring(0, 10)
+const AIRDROP = web3.sha3('AIRDROP').substring(0, 10)
+const AUDIT = web3.sha3('AUDIT').substring(0, 10)
 const AIRDROP_REWARD = new BigNumber(1)
 
 /**

@@ -37,6 +37,15 @@ contract Forum is Ownable {
         uint timestamp
     );
 
+    event PostMilestone (
+        address indexed poster,
+        bytes32 indexed postHash,
+        address indexed tokenAddress,
+        uint value ,
+        uint price,
+        uint timestamp
+    );
+
     event UpdatePost (
         address indexed poster,
         bytes32 indexed postHash,
@@ -80,6 +89,12 @@ contract Forum is Ownable {
     mapping(bytes32 => bytes4) public callValidateSigs;
     // store the airdrop function sigs
     mapping(bytes32 => bytes4) public callAirdropSigs;
+
+    // mapping for milestone 
+    mapping(bytes32 => address) public milestoneTokenAddrs; 
+    mapping(bytes32 => address) public milestonePoster; 
+    mapping(bytes32 => uint) public milestoneValues;
+    mapping(bytes32 => uint) public milestonePrices;
 
     /*
       Retrieve a batch of posts/replies by hashes
@@ -198,6 +213,43 @@ contract Forum is Ownable {
             airdropContractAddress, 
             callValidateSig, 
             callAirdropSig, 
+            now);
+    }
+
+    /*
+    * Associate a milestone event for a post
+    * provide a put-option
+    * which means investor can purchase put-option by the given price
+    * this put-option provide total [value] number of token 
+    *
+    * @param postHash hash of a post
+    * @param tokenAddr address of the target token
+    * @param value number of tokens to be transfered in
+    * @param price put-option price ( basic token unit / wei ) 
+    */
+    function postMilestone(
+        bytes32 postHash,
+        address tokenAddr,
+        uint value,
+        uint price
+    )
+        external 
+    {
+        require(milestonePoster[postHash] == NULL);
+
+        milestonePoster[postHash] = msg.sender;
+        milestoneTokenAddrs[postHash] = tokenAddr;
+        milestoneValues[postHash] = value;
+        milestonePrices[postHash] = price;
+
+        ERC20(tokenAddr).transferFrom(msg.sender, this, value);
+
+        emit PostMilestone(
+            msg.sender, 
+            postHash, 
+            tokenAddr, 
+            value, 
+            price, 
             now);
     }
 
