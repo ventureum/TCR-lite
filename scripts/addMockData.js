@@ -40,9 +40,9 @@ const posts = {}
 const replies = {}
 
 const ipfsPaths = [
-  'QmW1bPXjqDB6Pb5bv5mvS3oX2y5eePkAABvX9uNDm71PDu',
-  'QmW1bPXjqDB6Pb5bv5mvS3oX2y5eePkAABvX9uNDm71PDu',
-  'QmW1bPXjqDB6Pb5bv5mvS3oX2y5eePkAABvX9uNDm71PDu']
+  'QmZNnEU7CzHUjnK6W11zPZcsBQmE7QRrmm334Gf2XgSxyn',
+  'QmZNnEU7CzHUjnK6W11zPZcsBQmE7QRrmm334Gf2XgSxyn',
+  'QmZNnEU7CzHUjnK6W11zPZcsBQmE7QRrmm334Gf2XgSxyn']
 
 const ipfsMultihash = []
 
