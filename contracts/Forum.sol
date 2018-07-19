@@ -1,11 +1,10 @@
 pragma solidity^0.4.24;
 
-import "./DLLBytes32.sol";
+import "./library/DLLBytes32.sol";
 import "./mocks/AirdropMock.sol";
 import "openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
-
 
 
 contract Forum is Ownable {

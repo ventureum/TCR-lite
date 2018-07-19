@@ -3,7 +3,8 @@ pragma solidity ^0.4.24;
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
 import "vetx-token/contracts/VetXToken.sol";
-import "./DLLBytes32.sol";
+import "./library/DLLBytes32.sol";
+
 
 contract Registry is Ownable {
     using SafeMath for uint;
