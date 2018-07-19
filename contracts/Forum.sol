@@ -5,6 +5,7 @@ import "./mocks/AirdropMock.sol";
 import "openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
+import "vetx-token/contracts/VetXToken.sol";
 
 
 contract Forum is Ownable {
@@ -37,12 +38,27 @@ contract Forum is Ownable {
         uint timestamp
     );
 
+    event SetPutOptionFee (
+        bytes32 indexed postHash,
+        uint indexed putOptionRate,
+        bool indexed rateGtOne,
+        uint timestamp
+    );
+
     event PostMilestone (
         address indexed poster,
         bytes32 indexed postHash,
         address indexed tokenAddress,
         uint value ,
         uint price,
+        uint timestamp
+    );
+
+    event PurchasePutOption (
+        address indexed requester,
+        bytes32 indexed postHash,
+        address indexed purchaser,
+        uint value,
         uint timestamp
     );
 
@@ -70,6 +86,8 @@ contract Forum is Ownable {
         mapping(bytes32 => DLLBytes32.Data) replies;
     }
 
+    VetXToken vetx;
+
     address constant NULL = address(0x0);
 
     uint public feesPercentage = 5;
@@ -95,6 +113,15 @@ contract Forum is Ownable {
     mapping(bytes32 => address) public milestonePoster; 
     mapping(bytes32 => uint) public milestoneValues;
     mapping(bytes32 => uint) public milestonePrices;
+
+    mapping(bytes32 => mapping(address => uint)) public putOptionValuesForInvestor;
+
+    mapping(bytes32 => uint) public putOptionFeeRate;
+    mapping(bytes32 => bool) public putOptionFeeRateGtOne;
+
+    constructor(address vetxAddr) {
+        vetx = VetXToken(vetxAddr);
+    }
 
     /*
       Retrieve a batch of posts/replies by hashes
@@ -213,6 +240,65 @@ contract Forum is Ownable {
             airdropContractAddress, 
             callValidateSig, 
             callAirdropSig, 
+            now);
+    }
+
+    /*
+    * Set the put option fee for purchase 
+    * When the investor wanna purchase put option, they need to pay
+    *  [numOfToken * rate] or [numOfToken / rate] fee
+    *
+    * @param postHash the hash of the associated post
+    * @param putOptionRate vtx per token or token per vtx.
+    * @param rateGtOne if true means rate is vtx per token, else token per vtx
+    */
+    function setPutOptionFee(bytes32 postHash, uint putOptionRate, bool rateGtOne) 
+        external
+        onlyOwner 
+    {
+        require (milestonePoster[postHash] != NULL);
+        require (putOptionRate != 0);
+
+        putOptionFeeRate[postHash] = putOptionRate;
+        putOptionFeeRateGtOne[postHash] = rateGtOne;
+
+        emit SetPutOptionFee(
+            postHash,
+            putOptionRate,
+            rateGtOne,
+            now);
+    }
+
+    /*
+    * Purchase a put-option with [value] target tokens
+    * First calculate the number of VTX needed using a pre-defined
+    * value [PUT_OPTION_FEE]
+    *
+    * @param postHash the hash of the associated post
+    * @param purchaser the address of a purchaser
+    * @param value the number of target tokens to sell in a put-option
+    */
+    function purchasePutOption(bytes32 postHash, address purchaser, uint value) 
+        external
+    {
+        require(putOptionFeeRate[postHash] > 0 && milestonePoster[postHash] != NULL);
+
+        uint rate = putOptionFeeRate[postHash];
+
+        uint fee = putOptionFeeRateGtOne[postHash] ? value * rate : value / rate;
+
+        require(vetx.transferFrom(purchaser, this, fee));
+
+        require(milestoneValues[postHash] >= value);
+
+        putOptionValuesForInvestor[postHash][purchaser] = 
+            putOptionValuesForInvestor[postHash][purchaser].add(value);
+
+        emit PurchasePutOption(
+            msg.sender,
+            postHash,
+            purchaser,
+            value,
             now);
     }
 
@@ -381,6 +467,21 @@ contract Forum is Ownable {
         returns (bytes32) 
     {
         return boards[boardId].replies[postId].getNext(curr);
+    }
+
+    /*
+    * get the put option fee 
+    *
+    * @param postHash the hash of the associated post
+    */
+    function getPutOptionFee(bytes32 postHash) 
+        public
+        view
+        returns (uint, bool)
+    {
+        require (putOptionFeeRate[postHash] != 0);
+
+        return (putOptionFeeRate[postHash], putOptionFeeRateGtOne[postHash]);
     }
 
     /**
