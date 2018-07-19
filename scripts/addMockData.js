@@ -49,7 +49,7 @@ const ipfsMultihash = []
 // first 4 bytes
 const COMMENT_TYPE = web3.sha3('COMMENT').substring(0, 10)
 const POST_TYPE = web3.sha3('POST').substring(0, 10)
-const BOARD_ALL = web3.sha3('%__AllBoardIds__%')
+const BOARD_ALL = web3.sha3('%__AllBoardId__%')
 
 
 /**
