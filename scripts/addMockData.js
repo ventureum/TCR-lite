@@ -40,15 +40,16 @@ const posts = {}
 const replies = {}
 
 const ipfsPaths = [
-  'QmW1bPXjqDB6Pb5bv5mvS3oX2y5eePkAABvX9uNDm71PDu',
-  'QmW1bPXjqDB6Pb5bv5mvS3oX2y5eePkAABvX9uNDm71PDu',
-  'QmW1bPXjqDB6Pb5bv5mvS3oX2y5eePkAABvX9uNDm71PDu']
+  'QmZNnEU7CzHUjnK6W11zPZcsBQmE7QRrmm334Gf2XgSxyn',
+  'QmZNnEU7CzHUjnK6W11zPZcsBQmE7QRrmm334Gf2XgSxyn',
+  'QmZNnEU7CzHUjnK6W11zPZcsBQmE7QRrmm334Gf2XgSxyn']
 
 const ipfsMultihash = []
 
 // first 4 bytes
 const COMMENT_TYPE = web3.sha3('COMMENT').substring(0, 10)
 const POST_TYPE = web3.sha3('POST').substring(0, 10)
+const BOARD_ALL = web3.sha3('%__AllBoardId__%')
 
 
 /**
@@ -113,13 +114,13 @@ module.exports = async function (callback) {
 
     let follows = [
       {'source': `timeline:${accounts[userId]}`, 'target': `user:${accounts[userId]}`},
-      {'source': `timeline:${accounts[userId]}`, 'target': `board:all`}
+      {'source': `timeline:${accounts[userId]}`, 'target': `board:${BOARD_ALL}`}
     ]
 
     clientServer.followMany(follows)
   }
 
-  let _board = clientServer.feed('board', 'all')
+  let _board = clientServer.feed('board', BOARD_ALL)
   console.log('board:all token is ' + _board.token)
 
   console.log('================= Deploy Tokens =================')
@@ -147,7 +148,7 @@ module.exports = async function (callback) {
         foreign_id: 'post:' + posts[tokens[j]][i],
         time: new Date(),
         rewards: 0,
-        to: ['board:all', 'board:' + boards[j]]
+        to: ['board:${BOARD_ALL}', 'board:' + boards[j]]
       }
 
       // add activity to our mapping
