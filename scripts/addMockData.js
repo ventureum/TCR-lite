@@ -46,6 +46,11 @@ const ipfsPaths = [
 
 const ipfsMultihash = []
 
+// first 4 bytes
+const COMMENT_TYPE = web3.sha3('COMMENT').substring(0, 10)
+const POST_TYPE = web3.sha3('POST').substring(0, 10)
+
+
 /**
  * Partition multihash string into object representing multihash
  *
@@ -132,7 +137,7 @@ module.exports = async function (callback) {
   for (let j = 0; j < tokens.length; j++) {
     for (let i = 0; i < NUM_POST_HASH; i++) {
       let userId = (j * i) % 10
-      await forum.post(boards[j], web3.toHex(0), posts[tokens[j]][i], ipfsMultihash[0].digest, {from: accounts[userId]})
+      await forum.post(boards[j], web3.toHex(0), posts[tokens[j]][i], ipfsMultihash[0].digest, POST_TYPE, {from: accounts[userId]})
 
       // Add activity
       let activity = {
@@ -164,7 +169,7 @@ module.exports = async function (callback) {
     for (let i = 0; i < NUM_POST_HASH; i++) {
       for (let k = 0; k < NUM_REPLY_HASH; k++) {
         let userId = (i * j * k) % 10
-        await forum.post(boards[j], posts[tokens[j]][i], replies[posts[tokens[j]][i]][k], ipfsMultihash[0].digest, {from: accounts[userId]})
+        await forum.post(boards[j], posts[tokens[j]][i], replies[posts[tokens[j]][i]][k], ipfsMultihash[0].digest, COMMENT_TYPE, {from: accounts[userId]})
 
         // Add activity
         let activity = {
