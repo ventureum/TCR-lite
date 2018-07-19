@@ -56,7 +56,7 @@ const run = exports.run = async (accounts) => {
   /**
    * deploy TCR-lite contract
    */
-  instances.forum = await Forum.Self.new()
+  instances.forum = await Forum.Self.new(instances.vetXToken.address)
   instances.registry = await Registry.Self.new(instances.vetXToken.address)
   instances.reputationExchange = await ReputationExchange.Self.new(
     instances.kernel.address,

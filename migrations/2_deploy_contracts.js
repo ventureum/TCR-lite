@@ -60,7 +60,7 @@ module.exports = function (deployer, network, accounts) {
 
     // deploy own solidity contract
     await deployer.deploy(Registry.Self, VetXToken.Self.address)
-    await deployer.deploy(Forum.Self)
+    await deployer.deploy(Forum.Self, VetXToken.Self.address)
     await deployer.deploy(
       ReputationExchange.Self,
       Kernel.Self.address,
