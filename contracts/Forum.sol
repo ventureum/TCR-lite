@@ -45,11 +45,19 @@ contract Forum is Ownable {
         uint timestamp
     );
 
+    event ExecutePutOption(
+        address indexed investor,
+        bytes32 indexed postHash,
+        uint tokenValue,
+        uint ethNum,
+        uint timestamp
+    );
+
     event PostMilestone (
         address indexed poster,
         bytes32 indexed postHash,
         address indexed tokenAddress,
-        uint value ,
+        uint value,
         uint price,
         uint timestamp
     );
@@ -111,10 +119,10 @@ contract Forum is Ownable {
     // mapping for milestone 
     mapping(bytes32 => address) public milestoneTokenAddrs; 
     mapping(bytes32 => address) public milestonePoster; 
-    mapping(bytes32 => uint) public milestoneValues;
+    mapping(bytes32 => uint) public milestoneTotalToken;
     mapping(bytes32 => uint) public milestonePrices;
 
-    mapping(bytes32 => mapping(address => uint)) public putOptionValuesForInvestor;
+    mapping(bytes32 => mapping(address => uint)) public putOptionNumTokenForInvestor;
 
     mapping(bytes32 => uint) public putOptionFeeRate;
     mapping(bytes32 => bool) public putOptionFeeRateGtOne;
@@ -276,29 +284,29 @@ contract Forum is Ownable {
     *
     * @param postHash the hash of the associated post
     * @param purchaser the address of a purchaser
-    * @param value the number of target tokens to sell in a put-option
+    * @param numToken the number of target tokens to sell in a put-option
     */
-    function purchasePutOption(bytes32 postHash, address purchaser, uint value) 
+    function purchasePutOption(bytes32 postHash, address purchaser, uint numToken) 
         external
     {
         require(putOptionFeeRate[postHash] > 0 && milestonePoster[postHash] != NULL);
 
         uint rate = putOptionFeeRate[postHash];
 
-        uint fee = putOptionFeeRateGtOne[postHash] ? value * rate : value / rate;
+        uint fee = putOptionFeeRateGtOne[postHash] ? numToken.mul(rate)  : numToken.div(rate);
 
         require(vetx.transferFrom(purchaser, this, fee));
 
-        require(milestoneValues[postHash] >= value);
+        require(milestoneTotalToken[postHash] >= numToken);
 
-        putOptionValuesForInvestor[postHash][purchaser] = 
-            putOptionValuesForInvestor[postHash][purchaser].add(value);
+        putOptionNumTokenForInvestor[postHash][purchaser] = 
+            putOptionNumTokenForInvestor[postHash][purchaser].add(numToken);
 
         emit PurchasePutOption(
             msg.sender,
             postHash,
             purchaser,
-            value,
+            numToken,
             now);
     }
 
@@ -306,36 +314,70 @@ contract Forum is Ownable {
     * Associate a milestone event for a post
     * provide a put-option
     * which means investor can purchase put-option by the given price
-    * this put-option provide total [value] number of token 
+    * this put-option provide total [numToken] number of token 
     *
     * @param postHash hash of a post
     * @param tokenAddr address of the target token
-    * @param value number of tokens to be transfered in
     * @param price put-option price ( basic token unit / wei ) 
     */
     function postMilestone(
         bytes32 postHash,
         address tokenAddr,
-        uint value,
         uint price
     )
         external 
+        payable
     {
         require(milestonePoster[postHash] == NULL);
 
+        //numToken is the number of token
+        uint numToken = msg.value.mul(price);
+        require (numToken > 0);
+
         milestonePoster[postHash] = msg.sender;
         milestoneTokenAddrs[postHash] = tokenAddr;
-        milestoneValues[postHash] = value;
+        milestoneTotalToken[postHash] = numToken;
         milestonePrices[postHash] = price;
 
-        ERC20(tokenAddr).transferFrom(msg.sender, this, value);
+        ERC20(tokenAddr).transferFrom(msg.sender, this, numToken);
 
         emit PostMilestone(
             msg.sender, 
             postHash, 
             tokenAddr, 
-            value, 
+            numToken, 
             price, 
+            now);
+    }
+    
+    /*
+    * Execute a put-option by selling [numToken] target tokens at
+    * put-option price, and transfer back ETH to a user
+    *
+    * @param postHash the hash of a milestone post
+    * @param numToken the number of target tokens to sell
+    */
+    function executePutOption(bytes32 postHash, uint numToken)
+        external
+    {
+        uint putOptionValue = putOptionNumTokenForInvestor[postHash][msg.sender];
+
+        require (putOptionValue >= numToken);
+        putOptionNumTokenForInvestor[postHash][msg.sender] = putOptionValue.sub(numToken);
+
+        ERC20 token = ERC20(milestoneTokenAddrs[postHash]);
+        uint price = milestonePrices[postHash];
+        uint ethNum = numToken.div(price);
+
+        require (token.transferFrom(msg.sender, this, numToken));
+
+        msg.sender.transfer(ethNum);
+
+        emit ExecutePutOption(
+            msg.sender,
+            postHash,
+            numToken,
+            ethNum,
             now);
     }
 
