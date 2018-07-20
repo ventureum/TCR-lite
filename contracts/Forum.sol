@@ -29,6 +29,12 @@ contract Forum is Ownable {
         uint timestamp
     );
 
+    event MilestoneWithdraw (
+        address indexed milestonePoster,
+        bytes32 indexed postHash,
+        uint indexed ethNum,
+        uint timestamp);
+
     event PostAirdrop (
         address indexed poster,
         bytes32 indexed postHash,
@@ -59,6 +65,7 @@ contract Forum is Ownable {
         address indexed tokenAddress,
         uint value,
         uint price,
+        uint endTime,
         uint timestamp
     );
 
@@ -119,8 +126,10 @@ contract Forum is Ownable {
     // mapping for milestone 
     mapping(bytes32 => address) public milestoneTokenAddrs; 
     mapping(bytes32 => address) public milestonePoster; 
-    mapping(bytes32 => uint) public milestoneTotalToken;
+    mapping(bytes32 => uint) public milestoneAvailableToken;
+    mapping(bytes32 => uint) public milestoneWithdrawEth;
     mapping(bytes32 => uint) public milestonePrices;
+    mapping(bytes32 => uint) public milestoneEndTime;
 
     mapping(bytes32 => mapping(address => uint)) public putOptionNumTokenForInvestor;
 
@@ -290,6 +299,7 @@ contract Forum is Ownable {
         external
     {
         require(putOptionFeeRate[postHash] > 0 && milestonePoster[postHash] != NULL);
+        require(milestoneEndTime[postHash] > now);
 
         uint rate = putOptionFeeRate[postHash];
 
@@ -297,8 +307,9 @@ contract Forum is Ownable {
 
         require(vetx.transferFrom(purchaser, this, fee));
 
-        require(milestoneTotalToken[postHash] >= numToken);
+        require(milestoneAvailableToken[postHash] >= numToken);
 
+        milestoneAvailableToken[postHash] = milestoneAvailableToken[postHash].sub(numToken);
         putOptionNumTokenForInvestor[postHash][purchaser] = 
             putOptionNumTokenForInvestor[postHash][purchaser].add(numToken);
 
@@ -323,23 +334,25 @@ contract Forum is Ownable {
     function postMilestone(
         bytes32 postHash,
         address tokenAddr,
-        uint price
+        uint price,
+        uint endTime
     )
         external 
         payable
     {
         require(milestonePoster[postHash] == NULL);
+        require(endTime > now);
 
-        //numToken is the number of token
+        // numToken is the number of token
         uint numToken = msg.value.mul(price);
         require (numToken > 0);
 
         milestonePoster[postHash] = msg.sender;
         milestoneTokenAddrs[postHash] = tokenAddr;
-        milestoneTotalToken[postHash] = numToken;
+        milestoneAvailableToken[postHash] = numToken;
+        milestoneWithdrawEth[postHash] = msg.value;
         milestonePrices[postHash] = price;
-
-        ERC20(tokenAddr).transferFrom(msg.sender, this, numToken);
+        milestoneEndTime[postHash] = endTime;
 
         emit PostMilestone(
             msg.sender, 
@@ -347,6 +360,7 @@ contract Forum is Ownable {
             tokenAddr, 
             numToken, 
             price, 
+            endTime, 
             now);
     }
     
@@ -360,6 +374,8 @@ contract Forum is Ownable {
     function executePutOption(bytes32 postHash, uint numToken)
         external
     {
+        require(milestoneEndTime[postHash] > now);
+
         uint putOptionValue = putOptionNumTokenForInvestor[postHash][msg.sender];
 
         require (putOptionValue >= numToken);
@@ -369,7 +385,10 @@ contract Forum is Ownable {
         uint price = milestonePrices[postHash];
         uint ethNum = numToken.div(price);
 
+        milestoneWithdrawEth[postHash] = milestoneWithdrawEth[postHash].sub(ethNum);
+
         require (token.transferFrom(msg.sender, this, numToken));
+        require (token.transfer(milestonePoster[postHash], numToken));
 
         msg.sender.transfer(ethNum);
 
@@ -377,6 +396,23 @@ contract Forum is Ownable {
             msg.sender,
             postHash,
             numToken,
+            ethNum,
+            now);
+    }
+
+    function milestoneWithdraw(bytes32 postHash) external {
+        require(milestoneEndTime[postHash] < now);
+        require(milestonePoster[postHash] == msg.sender);
+
+        uint ethNum = milestoneWithdrawEth[postHash];
+        if (ethNum != 0) {
+            milestoneWithdrawEth[postHash] = 0;
+            msg.sender.transfer(ethNum);
+        }
+
+        emit MilestoneWithdraw (
+            msg.sender,
+            postHash,
             ethNum,
             now);
     }
