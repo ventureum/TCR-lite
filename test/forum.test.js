@@ -2,6 +2,7 @@ import {
   should,
   bs58,
   wweb3,
+  TimeSetter,
   Web3,
   Error
 } from "./constants.js"
@@ -97,7 +98,9 @@ function calculateFees (feesPercentage, val) {
   return val.times(feesPercentage).div(new BigNumber(100))
 }
 
+let context
 let token
+let vtx
 let forum
 let airdropMockToken
 let airdropMock
@@ -112,8 +115,9 @@ contract('Basic Tests: ', function (accounts) {
   const user3 = accounts[3]
 
   beforeEach(async function () {
-    let context = await shared.run(accounts)
+    context = await shared.run(accounts)
     token = context.mockToken1
+    vtx = context.vetXToken
     forum = context.forum
     airdropMockToken = context.airdropMockToken
     airdropMock = context.airdropMock
@@ -145,6 +149,249 @@ contract('Basic Tests: ', function (accounts) {
 
     it('by non-owner', async function () {
       await forum.setBoardToken(boards[0], token.address, {from: user1}).should.be.rejectedWith(EVMRevert)
+    })
+  })
+
+  describe('Milestone: ', function () {
+    let milestoneToken
+    const MILESTONE_PRICE = 10
+    const MILESTONE_ETH = 200
+    const MILESTONE_REFUND_ETH = 50
+    const MILESTONE_ENDTIME_DURATION = TimeSetter.OneMonth
+    const MILESTONE_POSTER = accounts[1]
+    const MILESTONE_BUYER1 = accounts[2]
+    const MILESTONE_BUYER2 = accounts[3]
+    const MILESTONE_BUYER_INIT_TOKEN = 1000000
+    const PUT_OPTION_FEE_RATE = 5
+    const PUT_OPTION_RATE_GT_ONE = true
+
+    beforeEach(async function () {
+      milestoneToken = context.mockToken2
+      await milestoneToken.transfer(MILESTONE_BUYER1, MILESTONE_BUYER_INIT_TOKEN);
+      await milestoneToken.transfer(MILESTONE_BUYER2, MILESTONE_BUYER_INIT_TOKEN);
+
+      await vtx.transfer(MILESTONE_BUYER1, MILESTONE_BUYER_INIT_TOKEN);
+      await vtx.transfer(MILESTONE_BUYER2, MILESTONE_BUYER_INIT_TOKEN);
+    })
+
+    it('postMilestone', async function () {
+      let endTimeExpect = TimeSetter.latestTime() + MILESTONE_ENDTIME_DURATION
+
+      await forum.postMilestone(
+        posts[0],
+        milestoneToken.address,
+        MILESTONE_PRICE,
+        endTimeExpect,
+        {from: MILESTONE_POSTER, value: MILESTONE_ETH}).should.be.fulfilled
+      let tokenAddress = await forum.milestoneTokenAddrs.call(posts[0])
+      tokenAddress.should.equal(milestoneToken.address)
+      let tokenNum = await forum.milestoneAvailableToken.call(posts[0])
+      tokenNum.should.be.bignumber.equal(new BigNumber(MILESTONE_PRICE * MILESTONE_ETH))
+      let ethNum = await forum.milestoneWithdrawEth.call(posts[0])
+      ethNum.should.be.bignumber.equal(new BigNumber(MILESTONE_ETH))
+      let price = await forum.milestonePrices.call(posts[0])
+      price.should.be.bignumber.equal(new BigNumber(MILESTONE_PRICE))
+      let endTime = await forum.milestoneEndTime.call(posts[0])
+      endTime.should.be.bignumber.equal(new BigNumber(endTimeExpect))
+    })
+
+    it('purchasePutOption: ', async function () {
+      let endTimeExpect = TimeSetter.latestTime() + MILESTONE_ENDTIME_DURATION
+
+      await forum.postMilestone(
+        posts[1],
+        milestoneToken.address,
+        MILESTONE_PRICE,
+        endTimeExpect,
+        {from: MILESTONE_POSTER, value: MILESTONE_ETH}).should.be.fulfilled
+
+      let numToken = MILESTONE_REFUND_ETH * MILESTONE_PRICE
+      // revert because not set put option fee
+      await forum.purchasePutOption(
+        posts[1],
+        MILESTONE_BUYER1,
+        numToken).should.be.rejectedWith(EVMRevert)
+
+      // set put option fee
+      await forum.setPutOptionFee(posts[1], PUT_OPTION_FEE_RATE, PUT_OPTION_RATE_GT_ONE).should.be.fulfilled
+
+      // revert because not approve
+      await forum.purchasePutOption(
+        posts[1],
+        MILESTONE_BUYER1,
+        numToken).should.be.rejectedWith(EVMRevert)
+
+      // approve forum contract transfer token from milestoneBuyer1
+      await vtx.approve(forum.address, numToken * PUT_OPTION_FEE_RATE, {from: MILESTONE_BUYER1})
+        .should.be.fulfilled
+
+      // collect info for test
+      const preVtxBalBuyer1 = await vtx.balanceOf(MILESTONE_BUYER1)
+      const preAvailableToken = await forum.milestoneAvailableToken.call(posts[1])
+      const preNumToken = await forum.putOptionNumTokenForInvestor.call(posts[1], MILESTONE_BUYER1)
+
+      await forum.purchasePutOption(
+        posts[1],
+        MILESTONE_BUYER1,
+        numToken).should.be.fulfilled
+
+      const postVtxBalBuyer1 = await vtx.balanceOf(MILESTONE_BUYER1)
+      const postAvailableToken = await forum.milestoneAvailableToken.call(posts[1])
+      const postNumToken = await forum.putOptionNumTokenForInvestor.call(posts[1], MILESTONE_BUYER1)
+
+      preVtxBalBuyer1.minus(postVtxBalBuyer1)
+        .should.be.bignumber.equal(new BigNumber(numToken * PUT_OPTION_FEE_RATE))
+      preAvailableToken.minus(postAvailableToken).should.be.bignumber.equal(new BigNumber(numToken))
+      postNumToken.minus(preNumToken).should.be.bignumber.equal(new BigNumber(numToken))
+
+      await vtx.approve(forum.address, (postAvailableToken + 1) * PUT_OPTION_FEE_RATE, {from: MILESTONE_BUYER1})
+        .should.be.fulfilled
+
+      // revert because no enough available token
+      await forum.purchasePutOption(
+        posts[1],
+        MILESTONE_BUYER1,
+        postAvailableToken + 1).should.be.rejectedWith(EVMRevert)
+
+      // revert because already pass the endTime
+      TimeSetter.increaseTimeTo(endTimeExpect + 1)
+      await forum.purchasePutOption(
+        posts[1],
+        MILESTONE_BUYER1,
+        numToken).should.be.rejectedWith(EVMRevert)
+    })
+
+    it('executePutOption: ', async function () {
+      let endTimeExpect = TimeSetter.latestTime() + MILESTONE_ENDTIME_DURATION
+
+      await forum.postMilestone(
+        posts[1],
+        milestoneToken.address,
+        MILESTONE_PRICE,
+        endTimeExpect,
+        {from: MILESTONE_POSTER, value: MILESTONE_ETH}).should.be.fulfilled
+
+      let numToken = MILESTONE_REFUND_ETH * MILESTONE_PRICE
+
+      // set put option fee
+      await forum.setPutOptionFee(posts[1], PUT_OPTION_FEE_RATE, PUT_OPTION_RATE_GT_ONE).should.be.fulfilled
+
+      // approve forum contract transfer token from milestoneBuyer1
+      await vtx.approve(forum.address, numToken * PUT_OPTION_FEE_RATE, {from: MILESTONE_BUYER1})
+        .should.be.fulfilled
+
+      await forum.purchasePutOption(
+        posts[1],
+        MILESTONE_BUYER1,
+        numToken).should.be.fulfilled
+
+      // approve forum contract transfer token from milestoneBuyer2
+      await vtx.approve(forum.address, numToken * PUT_OPTION_FEE_RATE, {from: MILESTONE_BUYER2})
+        .should.be.fulfilled
+
+      await forum.purchasePutOption(
+        posts[1],
+        MILESTONE_BUYER2,
+        numToken).should.be.fulfilled
+
+      // approve forum contract transfer milestone token from milestoneBuyer1
+      await milestoneToken.approve(forum.address, numToken, {from: MILESTONE_BUYER1})
+        .should.be.fulfilled
+
+      const preTokenNumBuyer1 = await milestoneToken.balanceOf(MILESTONE_BUYER1)
+      const preMilestoneWithdrawEth = await forum.milestoneWithdrawEth.call(posts[1])
+      const preEthBalForum = await web3.eth.getBalance(forum.address)
+
+      await forum.executePutOption(
+        posts[1],
+        numToken,
+        {from: MILESTONE_BUYER1}).should.be.fulfilled
+
+      const postTokenNumBuyer1 = await milestoneToken.balanceOf(MILESTONE_BUYER1)
+      const postMilestoneWithdrawEth = await forum.milestoneWithdrawEth.call(posts[1])
+      const postEthBalForum = await web3.eth.getBalance(forum.address)
+      const putOptionNumToken = await forum.putOptionNumTokenForInvestor.call(posts[1], MILESTONE_BUYER1)
+
+      preTokenNumBuyer1.minus(postTokenNumBuyer1).should.be.bignumber.equal(new BigNumber(numToken))
+      putOptionNumToken.should.be.bignumber.equal(new BigNumber(0))
+      preMilestoneWithdrawEth.minus(postMilestoneWithdrawEth)
+        .should.be.bignumber.equal(new BigNumber(MILESTONE_REFUND_ETH))
+      preEthBalForum.minus(postEthBalForum).should.be.bignumber.equal(new BigNumber(MILESTONE_REFUND_ETH))
+
+      // fast forward to pass the endTime
+      TimeSetter.increaseTimeTo(endTimeExpect + 1)
+
+      await forum.executePutOption(
+        posts[1],
+        numToken,
+        {from: MILESTONE_BUYER1}).should.be.rejectedWith(EVMRevert)
+    })
+
+    it('milestone withdraw: ', async function () {
+      let endTimeExpect = TimeSetter.latestTime() + MILESTONE_ENDTIME_DURATION
+
+      await forum.postMilestone(
+        posts[1],
+        milestoneToken.address,
+        MILESTONE_PRICE,
+        endTimeExpect,
+        {from: MILESTONE_POSTER, value: MILESTONE_ETH}).should.be.fulfilled
+
+      let numToken = MILESTONE_REFUND_ETH * MILESTONE_PRICE
+
+      // set put option fee
+      await forum.setPutOptionFee(posts[1], PUT_OPTION_FEE_RATE, PUT_OPTION_RATE_GT_ONE).should.be.fulfilled
+
+      // approve forum contract transfer token from milestoneBuyer1
+      await vtx.approve(forum.address, numToken * PUT_OPTION_FEE_RATE, {from: MILESTONE_BUYER1})
+        .should.be.fulfilled
+
+      await forum.purchasePutOption(
+        posts[1],
+        MILESTONE_BUYER1,
+        numToken).should.be.fulfilled
+
+      // approve forum contract transfer token from milestoneBuyer2
+      await vtx.approve(forum.address, numToken * PUT_OPTION_FEE_RATE, {from: MILESTONE_BUYER2})
+        .should.be.fulfilled
+
+      await forum.purchasePutOption(
+        posts[1],
+        MILESTONE_BUYER2,
+        numToken).should.be.fulfilled
+
+      // approve forum contract transfer milestone token from milestoneBuyer1
+      await milestoneToken.approve(forum.address, numToken, {from: MILESTONE_BUYER1})
+        .should.be.fulfilled
+
+      await forum.executePutOption(
+        posts[1],
+        numToken,
+        {from: MILESTONE_BUYER1}).should.be.fulfilled
+
+      // Test milestoneWithdraw
+      // revert because not expired
+      await forum.milestoneWithdraw(posts[1], {from: MILESTONE_POSTER})
+        .should.be.rejectedWith(EVMRevert)
+
+      // fast forward to pass the endTime
+      TimeSetter.increaseTimeTo(endTimeExpect + 1)
+
+      // revert because not milestone poster
+      await forum.milestoneWithdraw(posts[1]).should.be.rejectedWith(EVMRevert)
+
+      const preEthBalForum = await web3.eth.getBalance(forum.address)
+      const ethNum = await forum.milestoneWithdrawEth.call(posts[1])
+      ethNum.should.be.bignumber.equal(new BigNumber(MILESTONE_ETH - MILESTONE_REFUND_ETH))
+
+      await forum.milestoneWithdraw(posts[1], {from: MILESTONE_POSTER})
+        .should.be.fulfilled
+
+      const postEth = await forum.milestoneWithdrawEth.call(posts[1])
+      const postEthBalForum = await web3.eth.getBalance(forum.address)
+
+      postEth.should.be.bignumber.equal(new BigNumber(0))
+      preEthBalForum.minus(postEthBalForum).should.be.bignumber.equal(ethNum)
     })
   })
 
