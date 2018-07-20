@@ -303,7 +303,7 @@ contract Forum is Ownable {
 
         uint rate = putOptionFeeRate[postHash];
 
-        uint fee = putOptionFeeRateGtOne[postHash] ? numToken.mul(rate)  : numToken.div(rate);
+        uint fee = putOptionFeeRateGtOne[postHash] ? numToken.mul(rate) : numToken.div(rate);
 
         require(vetx.transferFrom(purchaser, this, fee));
 
