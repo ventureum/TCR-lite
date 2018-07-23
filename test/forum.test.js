@@ -408,7 +408,7 @@ contract('Basic Tests: ', function (accounts) {
         ipfsMultihash[0].digest,
         POST,
         {from: user1}).should.be.fulfilled
-      let content = await forum.getContentByHash.call(posts[0])
+      let content = await forum.contents.call(posts[0])
       content.should.equal(ipfsMultihash[0].digest)
     })
 
@@ -420,13 +420,13 @@ contract('Basic Tests: ', function (accounts) {
         airdropMockAirdrop,
         {from: user1}).should.be.fulfilled
 
-      const callAddress = await forum.getCallAddressByHash(posts[1])
+      const callAddress = await forum.callAddresses.call(posts[1])
       callAddress.should.be.equal(airdropMock.address)
 
-      const callValidateSig = await forum.getCallValidateSigByHash.call(posts[1])
+      const callValidateSig = await forum.callValidateSigs.call(posts[1])
       callValidateSig.should.equal(airdropMockValidate)
 
-      const callAirdropSig = await forum.getCallAirdropSigByHash.call(posts[1])
+      const callAirdropSig = await forum.callAirdropSigs.call(posts[1])
       callAirdropSig.should.equal(airdropMockAirdrop)
     })
 
@@ -460,7 +460,7 @@ contract('Basic Tests: ', function (accounts) {
 
     it('Update post by poster', async function () {
       await forum.updatePost(posts[0], ipfsMultihash[1].digest, {from: user1}).should.be.fulfilled
-      let content = await forum.getContentByHash.call(posts[0])
+      let content = await forum.contents.call(posts[0])
       content.should.equal(ipfsMultihash[1].digest)
     })
 
