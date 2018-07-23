@@ -519,22 +519,6 @@ contract Forum is Ownable {
         return boards[boardId].token;
     }
 
-    function getCallAddressByHash (bytes32 hash) public view returns (address) {
-        return callAddresses[hash];
-    }
-
-    function getCallValidateSigByHash (bytes32 hash) public view returns (bytes4) {
-        return callValidateSigs[hash];
-    }
-
-    function getCallAirdropSigByHash (bytes32 hash) public view returns (bytes4) {
-        return callAirdropSigs[hash];
-    }
-
-    function getContentByHash(bytes32 hash) public view returns (bytes32) {
-        return contents[hash];
-    }
-
     function getNextPostByHash(bytes32 boardId, bytes32 curr) public view returns (bytes32) {
         return boards[boardId].posts.getNext(curr);
     }
@@ -548,19 +532,20 @@ contract Forum is Ownable {
     }
 
     /*
-    * get the put option fee 
-    *
-    * @param postHash the hash of the associated post
+    * Note: how to get the put option fee by post hash
+    * postHash: hash value of a board id
+    * value: the number of token of put-option purchase 
     */
-    function getPutOptionFee(bytes32 postHash) 
-        public
-        view
-        returns (uint, bool)
-    {
+    /*
         require (putOptionFeeRate[postHash] != 0);
 
-        return (putOptionFeeRate[postHash], putOptionFeeRateGtOne[postHash]);
-    }
+        rate = putOptionFeeRate[postHash], 
+        gtOne = putOptionFeeRateGtOne[postHash];
+        if (gtOne > 1) // vtx per token {
+            return value * rate
+        }
+        return value / rate
+    */
 
     /**
     *  check this board is exist or not
