@@ -7,6 +7,20 @@ import "vetx-token/contracts/VetXToken.sol";
 contract ReputationExchange is Module {
     using SafeMath for uint;
 
+    event PurchaseReputation(
+        address indexed sender,
+        address indexed purchaser,
+        uint indexed value,
+        uint timestamp);
+
+        //uint256[] indexed values,
+        //address[] indexed beneficiaries,
+    event BatchExchange(
+        address indexed admin,
+        address[] beneficiaries,
+        uint256[] values,
+        uint timestamp);
+
     VetXToken public token;
 
     constructor (address kernelAddr, address vetXAddress) Module(kernelAddr) public {
@@ -29,6 +43,12 @@ contract ReputationExchange is Module {
      */
     function purchaseReputation(address purchaser, uint value) external {
         token.transferFrom(purchaser, this, value);
+
+        emit PurchaseReputation(
+            msg.sender,
+            purchaser,
+            value,
+            now);
     }
 
     /*
@@ -39,11 +59,17 @@ contract ReputationExchange is Module {
      * @param beneficiaries the addresses of the beneficiaries.
      * @param values the values that will transfer to beneficiaries.
      */
-    function batchExchange(address[] beneficiaries, uint[] values) connected {
+    function batchExchange(address[] beneficiaries, uint[] values) {
         require(beneficiaries.length == values.length);
 
         for (uint i = 0; i < values.length; i++) {
             token.transfer(beneficiaries[i], values[i]);
         }
+
+        emit BatchExchange(
+            msg.sender,
+            beneficiaries,
+            values,
+            now);
     }
 }
