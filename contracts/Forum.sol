@@ -135,6 +135,7 @@ contract Forum is Ownable {
 
     mapping(bytes32 => uint) public putOptionFeeRate;
     mapping(bytes32 => bool) public putOptionFeeRateGtOne;
+    mapping(bytes32 => uint) public optionsPurchased;
 
     constructor(address vetxAddr) {
         vetx = VetXToken(vetxAddr);
@@ -313,6 +314,8 @@ contract Forum is Ownable {
         putOptionNumTokenForInvestor[postHash][purchaser] = 
             putOptionNumTokenForInvestor[postHash][purchaser].add(numToken);
 
+        optionsPurchased[postHash] = optionsPurchased[postHash].add(numToken);
+
         emit PurchasePutOption(
             msg.sender,
             postHash,
@@ -362,6 +365,19 @@ contract Forum is Ownable {
             price, 
             endTime, 
             now);
+    }
+
+    function getMilestoneData(bytes32 postHash)
+        public
+        returns (address, uint ,uint, uint, uint, uint, bool) {
+        return (
+            milestoneTokenAddrs[postHash],        // address
+            milestoneAvailableToken[postHash],    // available options to be purchased
+            milestonePrices[postHash],            // price of the option
+            milestoneEndTime[postHash],           // end time of the event
+            optionsPurchased[postHash],           // total options (in target token) purchased
+            putOptionFeeRate[postHash],           // option fee
+            putOptionFeeRateGtOne[postHash]);     // option fee greater than one
     }
     
     /*
