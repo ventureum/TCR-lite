@@ -20,7 +20,7 @@ contract Forum is Ownable {
       Type = [ POST | COMMENT | AUDIT | AIRDROP ]
      */
     event Post (
-        address indexed poster,
+        address indexed actor,
         bytes32 indexed boardId,
         bytes32 parentHash,
         bytes32 indexed postHash,
@@ -36,7 +36,7 @@ contract Forum is Ownable {
         uint timestamp);
 
     event PostAirdrop (
-        address indexed poster,
+        address indexed actor,
         bytes32 indexed postHash,
         address airdropContractAddress,
         bytes4 callValidateSig,
@@ -60,7 +60,7 @@ contract Forum is Ownable {
     );
 
     event PostMilestone (
-        address indexed poster,
+        address indexed actor,
         bytes32 indexed postHash,
         address indexed tokenAddress,
         uint value,
@@ -78,21 +78,21 @@ contract Forum is Ownable {
     );
 
     event UpdatePost (
-        address indexed poster,
+        address indexed actor,
         bytes32 indexed postHash,
         bytes32 ipfsPath,
         uint timestamp
     );
 
     event Upvote(
-        address indexed upvoter,
+        address indexed actor,
         bytes32 indexed boardId,
         bytes32 indexed postHash,
         uint value,
         uint timestamp
     );
 
-    event Withdraw(address indexed poster, bytes32 indexed postHash, uint rewards, uint timestamp);
+    event Withdraw(address indexed actor, bytes32 indexed postHash, uint rewards, uint timestamp);
 
     struct Board {
         bool exist;
@@ -184,8 +184,8 @@ contract Forum is Ownable {
     }
 
     /*
-     * Call airdrop function that poster provide. 
-     * More behavior depends on the airdrop function that poster provider 
+     * Call airdrop function that actor provide.
+     * More behavior depends on the airdrop function that actor provider
      *  (usually the airdrop function will check sender's permission for airdrop)
      *
      * @param hashes hash array of posts/replies to be retrieved
@@ -228,11 +228,11 @@ contract Forum is Ownable {
 
     /*
     *  Assicoate an airdrop event with a post
-    *  A post with airdrop means user can receive free token by poster's policy
+    *  A post with airdrop means user can receive free token by actor's policy
     *  An user can call:
     *    airdropContractAddress.callValidateSig to check if the user has permission
     *    airdropContractAddress.callAirdropSig to trigger airdrop in order to receive free token
-    *       (depend on poster's airdrop policy)
+    *       (depend on actor's airdrop policy)
     *
     *  @param postHash hash value of a post
     *  @param airdropContractAddress airdrop contract address
@@ -493,15 +493,15 @@ contract Forum is Ownable {
     /*
     *  upvote a post
     *
-    *  @param upvoter  the address of the upvoter
+    *  @param actor  the address of the actor
     *  @param postHash hash value of a post
     *  @param value the number of upvote
     */
-    function upvote(address upvoter, bytes32 postHash, uint value) external {
+    function upvote(address actor, bytes32 postHash, uint value) external {
         require(recordExist(postHash));
 
         bytes32 boardId = fromBoard[postHash];
-        require(ERC20(boards[boardId].token).transferFrom(upvoter, address(this), value));
+        require(ERC20(boards[boardId].token).transferFrom(actor, address(this), value));
 
         uint fees = (value.mul(5)).div(100);
 
@@ -509,11 +509,11 @@ contract Forum is Ownable {
 
         rewards[postHash] = rewards[postHash].add(value.sub(fees));
 
-        emit Upvote(upvoter, boardId, postHash, value, now);
+        emit Upvote(actor, boardId, postHash, value, now);
     }
 
     /*
-    *  the poster withdraw the reward
+    *  the actor withdraw the reward
     *
     *  @param postHash hash value of a post
     */
