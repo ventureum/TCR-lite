@@ -5,7 +5,7 @@ import {
   TimeSetter,
   Web3,
   Error
-} from "./constants.js"
+} from './constants.js'
 const shared = require('./shared.js')
 
 const EVMRevert = Error.EVMRevert
@@ -49,14 +49,14 @@ const AIRDROP_REWARD = new BigNumber(1)
  * @param {string} multihash A base58 encoded multihash string
  * @returns {Multihash}
  */
-export function getBytes32FromMultiash(multihash) {
-  const decoded = bs58.decode(multihash);
+export function getBytes32FromMultiash (multihash) {
+  const decoded = bs58.decode(multihash)
 
   return {
     digest: `0x${decoded.slice(2).toString('hex')}`,
     hashFunction: decoded[0],
-    size: decoded[1],
-  };
+    size: decoded[1]
+  }
 }
 
 /**
@@ -65,29 +65,29 @@ export function getBytes32FromMultiash(multihash) {
  * @param {array} response Response array from Solidity
  * @returns {Multihash} multihash object
  */
-export function parseContractResponse(response) {
-  const [digest, hashFunction, size] = response;
+export function parseContractResponse (response) {
+  const [digest, hashFunction, size] = response
   return {
     digest,
     hashFunction: hashFunction.toNumber(),
-    size: size.toNumber(),
-  };
+    size: size.toNumber()
+  }
 }
 
-export function getMultihashFromBytes32(digest) {
-  const hashFunction = 18;
-  const size = 32;
+export function getMultihashFromBytes32 (digest) {
+  const hashFunction = 18
+  const size = 32
 
   // cut off leading "0x"
-  const hashBytes = Buffer.from(digest.slice(2), 'hex');
+  const hashBytes = Buffer.from(digest.slice(2), 'hex')
 
   // prepend hashFunction and digest size
-  const multihashBytes = new (hashBytes.constructor)(2 + hashBytes.length);
-  multihashBytes[0] = hashFunction;
-  multihashBytes[1] = size;
-  multihashBytes.set(hashBytes, 2);
+  const multihashBytes = new (hashBytes.constructor)(2 + hashBytes.length)
+  multihashBytes[0] = hashFunction
+  multihashBytes[1] = size
+  multihashBytes.set(hashBytes, 2)
 
-  return bs58.encode(multihashBytes);
+  return bs58.encode(multihashBytes)
 }
 
 for (let i = 0; i < ipfsPaths.length; i++) {
@@ -124,8 +124,8 @@ contract('Basic Tests: ', function (accounts) {
 
     let AirdropMockWeb3 = web3.eth.contract(airdropMock.abi)
     let airdropMockWeb3Instance = AirdropMockWeb3.at(airdropMock.address)
-    airdropMockValidate = airdropMockWeb3Instance.validate.getData("0x0").slice(0, 10)
-    airdropMockAirdrop = airdropMockWeb3Instance.airdrop.getData("0x0").slice(0, 10)
+    airdropMockValidate = airdropMockWeb3Instance.validate.getData('0x0').slice(0, 10)
+    airdropMockAirdrop = airdropMockWeb3Instance.airdrop.getData('0x0').slice(0, 10)
   })
 
   describe('Add a board: ', function () {
@@ -134,7 +134,7 @@ contract('Basic Tests: ', function (accounts) {
     })
 
     it('by non-owner', async function () {
-      await forum.addBoard(boards[0], token.address, {from: user1}).should.be.rejectedWith(EVMRevert)
+      await forum.addBoard(boards[0], token.address, { from: user1 }).should.be.rejectedWith(EVMRevert)
     })
   })
 
@@ -148,7 +148,7 @@ contract('Basic Tests: ', function (accounts) {
     })
 
     it('by non-owner', async function () {
-      await forum.setBoardToken(boards[0], token.address, {from: user1}).should.be.rejectedWith(EVMRevert)
+      await forum.setBoardToken(boards[0], token.address, { from: user1 }).should.be.rejectedWith(EVMRevert)
     })
   })
 
@@ -167,11 +167,11 @@ contract('Basic Tests: ', function (accounts) {
 
     beforeEach(async function () {
       milestoneToken = context.mockToken2
-      await milestoneToken.transfer(MILESTONE_BUYER1, MILESTONE_BUYER_INIT_TOKEN);
-      await milestoneToken.transfer(MILESTONE_BUYER2, MILESTONE_BUYER_INIT_TOKEN);
+      await milestoneToken.transfer(MILESTONE_BUYER1, MILESTONE_BUYER_INIT_TOKEN)
+      await milestoneToken.transfer(MILESTONE_BUYER2, MILESTONE_BUYER_INIT_TOKEN)
 
-      await vtx.transfer(MILESTONE_BUYER1, MILESTONE_BUYER_INIT_TOKEN);
-      await vtx.transfer(MILESTONE_BUYER2, MILESTONE_BUYER_INIT_TOKEN);
+      await vtx.transfer(MILESTONE_BUYER1, MILESTONE_BUYER_INIT_TOKEN)
+      await vtx.transfer(MILESTONE_BUYER2, MILESTONE_BUYER_INIT_TOKEN)
     })
 
     it('postMilestone', async function () {
@@ -182,7 +182,7 @@ contract('Basic Tests: ', function (accounts) {
         milestoneToken.address,
         MILESTONE_PRICE,
         endTimeExpect,
-        {from: MILESTONE_POSTER, value: MILESTONE_ETH}).should.be.fulfilled
+        { from: MILESTONE_POSTER, value: MILESTONE_ETH }).should.be.fulfilled
       let tokenAddress = await forum.milestoneTokenAddrs.call(posts[0])
       tokenAddress.should.equal(milestoneToken.address)
       let tokenNum = await forum.milestoneAvailableToken.call(posts[0])
@@ -203,7 +203,7 @@ contract('Basic Tests: ', function (accounts) {
         milestoneToken.address,
         MILESTONE_PRICE,
         endTimeExpect,
-        {from: MILESTONE_POSTER, value: MILESTONE_ETH}).should.be.fulfilled
+        { from: MILESTONE_POSTER, value: MILESTONE_ETH }).should.be.fulfilled
 
       let numToken = MILESTONE_REFUND_ETH * MILESTONE_PRICE
       // revert because not set put option fee
@@ -222,7 +222,7 @@ contract('Basic Tests: ', function (accounts) {
         numToken).should.be.rejectedWith(EVMRevert)
 
       // approve forum contract transfer token from milestoneBuyer1
-      await vtx.approve(forum.address, numToken * PUT_OPTION_FEE_RATE, {from: MILESTONE_BUYER1})
+      await vtx.approve(forum.address, numToken * PUT_OPTION_FEE_RATE, { from: MILESTONE_BUYER1 })
         .should.be.fulfilled
 
       // collect info for test
@@ -244,7 +244,7 @@ contract('Basic Tests: ', function (accounts) {
       preAvailableToken.minus(postAvailableToken).should.be.bignumber.equal(new BigNumber(numToken))
       postNumToken.minus(preNumToken).should.be.bignumber.equal(new BigNumber(numToken))
 
-      await vtx.approve(forum.address, (postAvailableToken + 1) * PUT_OPTION_FEE_RATE, {from: MILESTONE_BUYER1})
+      await vtx.approve(forum.address, (postAvailableToken + 1) * PUT_OPTION_FEE_RATE, { from: MILESTONE_BUYER1 })
         .should.be.fulfilled
 
       // revert because no enough available token
@@ -269,7 +269,7 @@ contract('Basic Tests: ', function (accounts) {
         milestoneToken.address,
         MILESTONE_PRICE,
         endTimeExpect,
-        {from: MILESTONE_POSTER, value: MILESTONE_ETH}).should.be.fulfilled
+        { from: MILESTONE_POSTER, value: MILESTONE_ETH }).should.be.fulfilled
 
       let numToken = MILESTONE_REFUND_ETH * MILESTONE_PRICE
 
@@ -277,7 +277,7 @@ contract('Basic Tests: ', function (accounts) {
       await forum.setPutOptionFee(posts[1], PUT_OPTION_FEE_RATE, PUT_OPTION_RATE_GT_ONE).should.be.fulfilled
 
       // approve forum contract transfer token from milestoneBuyer1
-      await vtx.approve(forum.address, numToken * PUT_OPTION_FEE_RATE, {from: MILESTONE_BUYER1})
+      await vtx.approve(forum.address, numToken * PUT_OPTION_FEE_RATE, { from: MILESTONE_BUYER1 })
         .should.be.fulfilled
 
       await forum.purchasePutOption(
@@ -286,7 +286,7 @@ contract('Basic Tests: ', function (accounts) {
         numToken).should.be.fulfilled
 
       // approve forum contract transfer token from milestoneBuyer2
-      await vtx.approve(forum.address, numToken * PUT_OPTION_FEE_RATE, {from: MILESTONE_BUYER2})
+      await vtx.approve(forum.address, numToken * PUT_OPTION_FEE_RATE, { from: MILESTONE_BUYER2 })
         .should.be.fulfilled
 
       await forum.purchasePutOption(
@@ -295,7 +295,7 @@ contract('Basic Tests: ', function (accounts) {
         numToken).should.be.fulfilled
 
       // approve forum contract transfer milestone token from milestoneBuyer1
-      await milestoneToken.approve(forum.address, numToken, {from: MILESTONE_BUYER1})
+      await milestoneToken.approve(forum.address, numToken, { from: MILESTONE_BUYER1 })
         .should.be.fulfilled
 
       const preTokenNumBuyer1 = await milestoneToken.balanceOf(MILESTONE_BUYER1)
@@ -305,7 +305,7 @@ contract('Basic Tests: ', function (accounts) {
       await forum.executePutOption(
         posts[1],
         numToken,
-        {from: MILESTONE_BUYER1}).should.be.fulfilled
+        { from: MILESTONE_BUYER1 }).should.be.fulfilled
 
       const postTokenNumBuyer1 = await milestoneToken.balanceOf(MILESTONE_BUYER1)
       const postMilestoneWithdrawEth = await forum.milestoneWithdrawEth.call(posts[1])
@@ -324,7 +324,7 @@ contract('Basic Tests: ', function (accounts) {
       await forum.executePutOption(
         posts[1],
         numToken,
-        {from: MILESTONE_BUYER1}).should.be.rejectedWith(EVMRevert)
+        { from: MILESTONE_BUYER1 }).should.be.rejectedWith(EVMRevert)
     })
 
     it('milestone withdraw: ', async function () {
@@ -335,7 +335,7 @@ contract('Basic Tests: ', function (accounts) {
         milestoneToken.address,
         MILESTONE_PRICE,
         endTimeExpect,
-        {from: MILESTONE_POSTER, value: MILESTONE_ETH}).should.be.fulfilled
+        { from: MILESTONE_POSTER, value: MILESTONE_ETH }).should.be.fulfilled
 
       let numToken = MILESTONE_REFUND_ETH * MILESTONE_PRICE
 
@@ -343,7 +343,7 @@ contract('Basic Tests: ', function (accounts) {
       await forum.setPutOptionFee(posts[1], PUT_OPTION_FEE_RATE, PUT_OPTION_RATE_GT_ONE).should.be.fulfilled
 
       // approve forum contract transfer token from milestoneBuyer1
-      await vtx.approve(forum.address, numToken * PUT_OPTION_FEE_RATE, {from: MILESTONE_BUYER1})
+      await vtx.approve(forum.address, numToken * PUT_OPTION_FEE_RATE, { from: MILESTONE_BUYER1 })
         .should.be.fulfilled
 
       await forum.purchasePutOption(
@@ -352,7 +352,7 @@ contract('Basic Tests: ', function (accounts) {
         numToken).should.be.fulfilled
 
       // approve forum contract transfer token from milestoneBuyer2
-      await vtx.approve(forum.address, numToken * PUT_OPTION_FEE_RATE, {from: MILESTONE_BUYER2})
+      await vtx.approve(forum.address, numToken * PUT_OPTION_FEE_RATE, { from: MILESTONE_BUYER2 })
         .should.be.fulfilled
 
       await forum.purchasePutOption(
@@ -361,17 +361,17 @@ contract('Basic Tests: ', function (accounts) {
         numToken).should.be.fulfilled
 
       // approve forum contract transfer milestone token from milestoneBuyer1
-      await milestoneToken.approve(forum.address, numToken, {from: MILESTONE_BUYER1})
+      await milestoneToken.approve(forum.address, numToken, { from: MILESTONE_BUYER1 })
         .should.be.fulfilled
 
       await forum.executePutOption(
         posts[1],
         numToken,
-        {from: MILESTONE_BUYER1}).should.be.fulfilled
+        { from: MILESTONE_BUYER1 }).should.be.fulfilled
 
       // Test milestoneWithdraw
       // revert because not expired
-      await forum.milestoneWithdraw(posts[1], {from: MILESTONE_POSTER})
+      await forum.milestoneWithdraw(posts[1], { from: MILESTONE_POSTER })
         .should.be.rejectedWith(EVMRevert)
 
       // fast forward to pass the endTime
@@ -384,7 +384,7 @@ contract('Basic Tests: ', function (accounts) {
       const ethNum = await forum.milestoneWithdrawEth.call(posts[1])
       ethNum.should.be.bignumber.equal(new BigNumber(MILESTONE_ETH - MILESTONE_REFUND_ETH))
 
-      await forum.milestoneWithdraw(posts[1], {from: MILESTONE_POSTER})
+      await forum.milestoneWithdraw(posts[1], { from: MILESTONE_POSTER })
         .should.be.fulfilled
 
       const postEth = await forum.milestoneWithdrawEth.call(posts[1])
@@ -407,7 +407,7 @@ contract('Basic Tests: ', function (accounts) {
         posts[0],
         ipfsMultihash[0].digest,
         POST,
-        {from: user1}).should.be.fulfilled
+        { from: user1 }).should.be.fulfilled
       let content = await forum.contents.call(posts[0])
       content.should.equal(ipfsMultihash[0].digest)
     })
@@ -418,7 +418,7 @@ contract('Basic Tests: ', function (accounts) {
         airdropMock.address,
         airdropMockValidate,
         airdropMockAirdrop,
-        {from: user1}).should.be.fulfilled
+        { from: user1 }).should.be.fulfilled
 
       const callAddress = await forum.callAddresses.call(posts[1])
       callAddress.should.be.equal(airdropMock.address)
@@ -436,13 +436,13 @@ contract('Basic Tests: ', function (accounts) {
         airdropMock.address,
         airdropMockValidate,
         airdropMockAirdrop).should.be.fulfilled
-      const validate = await forum.airdropValidate(posts[2], {from: user2})
+      const validate = await forum.airdropValidate(posts[2], { from: user2 })
       validate.should.be.equal(true)
 
       const preBal = await airdropMockToken.balanceOf(user2).should.be.fulfilled
       const preBalAirdropMock = await airdropMockToken.balanceOf(airdropMock.address)
         .should.be.fulfilled
-      await forum.airdropCall(posts[2], {from: user2})
+      await forum.airdropCall(posts[2], { from: user2 })
       const postBal = await airdropMockToken.balanceOf(user2).should.be.fulfilled
       const postBalAirdropMock = await airdropMockToken.balanceOf(airdropMock.address)
         .should.be.fulfilled
@@ -455,17 +455,17 @@ contract('Basic Tests: ', function (accounts) {
   describe('Update post: ', function () {
     beforeEach(async function () {
       await forum.addBoard(boards[0], token.address).should.be.fulfilled
-      await forum.post(boards[0], web3.toHex(0), posts[0], ipfsMultihash[0].digest, POST, {from: user1}).should.be.fulfilled
+      await forum.post(boards[0], web3.toHex(0), posts[0], ipfsMultihash[0].digest, POST, { from: user1 }).should.be.fulfilled
     })
 
     it('Update post by poster', async function () {
-      await forum.updatePost(posts[0], ipfsMultihash[1].digest, {from: user1}).should.be.fulfilled
+      await forum.updatePost(posts[0], ipfsMultihash[1].digest, { from: user1 }).should.be.fulfilled
       let content = await forum.contents.call(posts[0])
       content.should.equal(ipfsMultihash[1].digest)
     })
 
     it('Update post by non original poster', async function () {
-      await forum.updatePost(posts[0], ipfsMultihash[2].digest, {from: user2}).should.be.rejectedWith(EVMRevert)
+      await forum.updatePost(posts[0], ipfsMultihash[2].digest, { from: user2 }).should.be.rejectedWith(EVMRevert)
     })
   })
 
@@ -474,19 +474,19 @@ contract('Basic Tests: ', function (accounts) {
 
     beforeEach(async function () {
       await forum.addBoard(boards[0], token.address).should.be.fulfilled
-      await forum.post(boards[0], web3.toHex(0), posts[0], ipfsMultihash[0].digest, POST, {from: user1}).should.be.fulfilled
-      await forum.post(boards[0], web3.toHex(0), posts[1], ipfsMultihash[1].digest, POST, {from: user1}).should.be.fulfilled
-      await forum.post(boards[0], web3.toHex(0), posts[2], ipfsMultihash[2].digest, POST, {from: user1}).should.be.fulfilled
+      await forum.post(boards[0], web3.toHex(0), posts[0], ipfsMultihash[0].digest, POST, { from: user1 }).should.be.fulfilled
+      await forum.post(boards[0], web3.toHex(0), posts[1], ipfsMultihash[1].digest, POST, { from: user1 }).should.be.fulfilled
+      await forum.post(boards[0], web3.toHex(0), posts[2], ipfsMultihash[2].digest, POST, { from: user1 }).should.be.fulfilled
 
       // replies
-      await forum.post(boards[0], posts[0], replies[0], ipfsMultihash[0].digest, POST, {from: user1}).should.be.fulfilled
+      await forum.post(boards[0], posts[0], replies[0], ipfsMultihash[0].digest, POST, { from: user1 }).should.be.fulfilled
 
-      await forum.post(boards[0], posts[1], replies[1], ipfsMultihash[0].digest, POST, {from: user1}).should.be.fulfilled
-      await forum.post(boards[0], posts[1], replies[2], ipfsMultihash[0].digest, POST, {from: user1}).should.be.fulfilled
+      await forum.post(boards[0], posts[1], replies[1], ipfsMultihash[0].digest, POST, { from: user1 }).should.be.fulfilled
+      await forum.post(boards[0], posts[1], replies[2], ipfsMultihash[0].digest, POST, { from: user1 }).should.be.fulfilled
 
-      await forum.post(boards[0], posts[2], replies[3], ipfsMultihash[0].digest, POST, {from: user1}).should.be.fulfilled
-      await forum.post(boards[0], posts[2], replies[4], ipfsMultihash[1].digest, POST, {from: user1}).should.be.fulfilled
-      await forum.post(boards[0], posts[2], replies[5], ipfsMultihash[2].digest, POST, {from: user1}).should.be.fulfilled
+      await forum.post(boards[0], posts[2], replies[3], ipfsMultihash[0].digest, POST, { from: user1 }).should.be.fulfilled
+      await forum.post(boards[0], posts[2], replies[4], ipfsMultihash[1].digest, POST, { from: user1 }).should.be.fulfilled
+      await forum.post(boards[0], posts[2], replies[5], ipfsMultihash[2].digest, POST, { from: user1 }).should.be.fulfilled
 
       repliesLen = [1, 2, 3]
     })
@@ -519,6 +519,54 @@ contract('Basic Tests: ', function (accounts) {
     it('getBoardToken', async function () {
       const tokenRes = await forum.getBoardToken.call(boards[0])
       tokenRes.should.equal(token.address)
+    })
+  })
+
+  describe('Reputation: ', function () {
+    const REPUTATION_RATE_1 = 5
+    const REPUTATION_RATE_1_GT_ONE = true
+    const REPUTATION_RATE_2 = 10
+    const REPUTATION_RATE_2_GT_ONE = false
+    const REPUTATION_BUYER = user1
+    const numToken = 10000
+    const EXPECTED_REPUTATION_1 = numToken * REPUTATION_RATE_1
+
+    beforeEach(async function () {
+      await vtx.transfer(REPUTATION_BUYER, numToken * 2)
+    })
+
+    it('purchaseReputation(for self): ', async function () {
+      // approve vtx tokens for fourm to take them out
+      await vtx.approve(forum.address, numToken, { from: REPUTATION_BUYER })
+        .should.be.fulfilled
+      // purchase for itself
+      let { logs } = await forum.purchaseReputation(REPUTATION_BUYER, numToken, {from: REPUTATION_BUYER})
+      const event = logs.find(e => e.event === 'PurchaseReputation')
+      event.args.msgSender.should.be.equal(REPUTATION_BUYER)
+      event.args.purchaser.should.be.equal(REPUTATION_BUYER)
+      event.args.numVetX.should.be.bignumber.equal(new BigNumber(numToken))
+      event.args.numReputation.should.be.bignumber.equal(new BigNumber(EXPECTED_REPUTATION_1))
+    })
+
+    it('purchaseReputation(for other): ', async function () {
+      // approve vtx tokens for fourm to take them out
+      await vtx.approve(forum.address, numToken, { from: REPUTATION_BUYER })
+        .should.be.fulfilled
+      // purchase for others
+      const { logs } = await forum.purchaseReputation(REPUTATION_BUYER, numToken, {from: root})
+      const event = logs.find(e => e.event === 'PurchaseReputation')
+      event.args.msgSender.should.be.equal(root)
+      event.args.purchaser.should.be.equal(REPUTATION_BUYER)
+      event.args.numVetX.should.be.bignumber.equal(new BigNumber(numToken))
+      event.args.numReputation.should.be.bignumber.equal(new BigNumber(EXPECTED_REPUTATION_1))
+    })
+
+    it('setReputationRate: ', async function () {
+      await forum.setReputationRate(REPUTATION_RATE_2, REPUTATION_RATE_2_GT_ONE)
+      let reputationRate = await forum.reputationRate.call()
+      let reputationRateGtOne = await forum.reputationRateGtOne.call()
+      reputationRate.should.be.bignumber.equal(new BigNumber(REPUTATION_RATE_2))
+      reputationRateGtOne.should.be.equal(REPUTATION_RATE_2_GT_ONE)
     })
   })
 })
