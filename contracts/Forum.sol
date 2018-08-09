@@ -33,7 +33,8 @@ contract Forum is Ownable {
         address indexed milestonePoster,
         bytes32 indexed postHash,
         uint indexed ethNum,
-        uint timestamp);
+        uint timestamp
+    );
 
     event PostAirdrop (
         address indexed actor,
@@ -92,6 +93,20 @@ contract Forum is Ownable {
         uint timestamp
     );
 
+    event PurchaseReputation(
+        address indexed msgSender,
+        address indexed purchaser, 
+        uint numVetX, 
+        uint numReputation,
+        uint timestamp
+    );
+
+    event SetReputationRate(
+        address indexed msgSender,
+        uint newReputationRate,
+        bool newReputationRateGtOne
+    );
+
     event Withdraw(address indexed actor, bytes32 indexed postHash, uint rewards, uint timestamp);
 
     struct Board {
@@ -107,6 +122,10 @@ contract Forum is Ownable {
 
     uint public feesPercentage = 5;
     uint constant BATCH_SIZE = 10;
+
+    // reputation / VetX 
+    uint public reputationRate = 5;
+    bool public reputationRateGtOne = true;
 
     mapping(bytes32 => Board) boards;
     mapping(bytes32 => bytes32) public contents;
@@ -527,6 +546,39 @@ contract Forum is Ownable {
 
         require(ERC20(boards[boardId].token).transfer(msg.sender, _rewards));
         emit Withdraw(msg.sender, postHash, _rewards, now);
+    }
+
+    /*
+    *  purcahse reputation for a user
+    *  @param purchaser address of purchaser
+    *  @param numVetX the number of Vetx token is spent/sent
+    */
+    function purchaseReputation(address purchaser, uint numVetX) external {
+        require(vetx.transferFrom(purchaser, this, numVetX));
+
+        uint rate = reputationRate;
+
+        uint numReputation = reputationRateGtOne ? numVetX.mul(rate) : numVetX.div(rate);
+
+        emit PurchaseReputation(msg.sender, purchaser, numVetX, numReputation, now);
+    }
+
+    /*
+    *  purcahse set reputation exchange rate 
+    *  @param newReputationRate the bnew reputation exchange rate
+    *  @param newReputationRateGtOne bool whether the rate is (reputation / vetX) (true) or
+    *    (VetX / reputation) (false)
+    */
+    function setReputationRate (uint newReputationRate, bool newReputationRateGtOne) 
+        external 
+        onlyOwner 
+    {
+        require(reputationRate != 0);
+
+        reputationRate = newReputationRate;
+        reputationRateGtOne = newReputationRateGtOne;
+
+        emit SetReputationRate(msg.sender, newReputationRate, newReputationRateGtOne);
     }
 
     // Utils functions
