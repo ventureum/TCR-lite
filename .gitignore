@@ -10,3 +10,4 @@ node_modules/
 build/
 run_test.sh
 test/local_test.js
+mnemonic.txt
